@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
 	<CubeBlocks>
-         <Definition xsi:type="MyObjectBuilder_FunctionalBlockDefinition">
+		<Definition xsi:type="MyObjectBuilder_FunctionalBlockDefinition">
 			<Id>
 				<TypeId>FunctionalBlock</TypeId>
 				<SubtypeId>AQD_LG_TrawlingNet</SubtypeId>
@@ -14,14 +14,14 @@
 			<Size x="3" y="2" z="3"/>
 			<ModelOffset x="0" y="0" z="0"/>
 			<Model>Models\Cubes\large\AQD_LG_TrawlingNet.mwm</Model>
-            <Components>
-                <Component Subtype="InteriorPlate" Count="20" />
-                <Component Subtype="Construction" Count="20" />
-                <Component Subtype="SmallTube" Count="10" />
-                <Component Subtype="Construction" Count="20" />
-                <Component Subtype="InteriorPlate" Count="20" />
-            </Components>
-            <CriticalComponent Subtype="Construction" Index="1" />
+			<Components>
+				<Component Subtype="InteriorPlate" Count="20" />
+				<Component Subtype="Construction" Count="20" />
+				<Component Subtype="SmallTube" Count="10" />
+				<Component Subtype="Construction" Count="20" />
+				<Component Subtype="InteriorPlate" Count="20" />
+			</Components>
+			<CriticalComponent Subtype="Construction" Index="1" />
 			<CriticalComponent Subtype="SteelPlate" Index="0"/>
 			<BlockPairName>AQD_LG_TrawlingNet</BlockPairName>
 			<MountPoints>
@@ -32,6 +32,9 @@
 			</MountPoints>
 			<MirroringY>Z</MirroringY>
 			<MirroringZ>Y</MirroringZ>
+			<BuildProgressModels>
+				<Model BuildPercentUpperBound="1.00" File="Models\Cubes\large\AQD_LG_TrawlingNet_BS1.mwm"/>
+			</BuildProgressModels>
 		</Definition>
 	</CubeBlocks>
 </Definitions>
