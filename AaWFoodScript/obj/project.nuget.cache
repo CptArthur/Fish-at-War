@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "fasqvF3P//s=",
+  "dgSpecHash": "NECLGHksJzg=",
   "success": true,
-  "projectFilePath": "D:\\SEMods-Github\\AaWFoodScript\\AaWFoodScript.csproj",
+  "projectFilePath": "D:\\SEMods-Github\\Fish at War\\AaWFoodScript\\AaWFoodScript.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\maart\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\3.1.0\\microsoft.windowsdesktop.app.ref.3.1.0.nupkg.sha512",
     "C:\\Users\\maart\\.nuget\\packages\\microsoft.netcore.app.ref\\3.1.0\\microsoft.netcore.app.ref.3.1.0.nupkg.sha512",
