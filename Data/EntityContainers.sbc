@@ -50,14 +50,11 @@
     -->
 
  
-		<!-- Algae Farm -->
 
-
-		<!-- Farm Plot -->
         <Container>
             <Id>
                 <TypeId>FunctionalBlock</TypeId>
-                <SubtypeId>LargeBlockFishNet</SubtypeId>
+                <SubtypeId>AQD_LG_TrawlingNet</SubtypeId>
             </Id>
             <DefaultComponents>
 				<Component BuilderType="MyObjectBuilder_Inventory" SubtypeId="FishNetLarge" ForceCreate="true"/>
@@ -65,17 +62,7 @@
             </DefaultComponents>
         </Container>
 		
-        <Container>
-            <Id>
-                <TypeId>FunctionalBlock</TypeId>
-                <SubtypeId>SmallBlockFishNet</SubtypeId>
-            </Id>
-            <DefaultComponents>
-				<Component BuilderType="MyObjectBuilder_Inventory" SubtypeId="FishNetSmall" ForceCreate="true"/>
-                <Component BuilderType="MyObjectBuilder_ConveyorEndpointComponent" SubtypeId="FishNet" ForceCreate="true"/>
-            </DefaultComponents>
-        </Container>
-				
+
 		
 		
 	
