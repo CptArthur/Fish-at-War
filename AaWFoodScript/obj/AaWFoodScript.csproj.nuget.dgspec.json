@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\SEMods-Github\\AaWFoodScript\\AaWFoodScript.csproj": {}
+    "D:\\SEMods-Github\\Fish at War\\AaWFoodScript\\AaWFoodScript.csproj": {}
   },
   "projects": {
-    "D:\\SEMods-Github\\AaWFoodScript\\AaWFoodScript.csproj": {
+    "D:\\SEMods-Github\\Fish at War\\AaWFoodScript\\AaWFoodScript.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\SEMods-Github\\AaWFoodScript\\AaWFoodScript.csproj",
+        "projectUniqueName": "D:\\SEMods-Github\\Fish at War\\AaWFoodScript\\AaWFoodScript.csproj",
         "projectName": "AaWFoodScript",
-        "projectPath": "D:\\SEMods-Github\\AaWFoodScript\\AaWFoodScript.csproj",
+        "projectPath": "D:\\SEMods-Github\\Fish at War\\AaWFoodScript\\AaWFoodScript.csproj",
         "packagesPath": "C:\\Users\\maart\\.nuget\\packages\\",
-        "outputPath": "D:\\SEMods-Github\\AaWFoodScript\\obj\\",
+        "outputPath": "D:\\SEMods-Github\\Fish at War\\AaWFoodScript\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

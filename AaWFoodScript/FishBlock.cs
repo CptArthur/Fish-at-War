@@ -41,7 +41,8 @@ namespace AaWFoodScript
 
         public override void UpdateAfterSimulation100()
         {
-            if (count < 15)
+
+            if (count < 6)
             {
                 count++;
                 return;
@@ -58,8 +59,11 @@ namespace AaWFoodScript
 
             var Agaris = MyGamePruningStructure.GetClosestPlanet(worldPosition);
 
-            //
-            if (WaterAPI.IsUnderwater(worldPosition, Agaris) && MapUtilities.IsAtFishLocation(worldPosition))
+
+            //GetClosestSurfacePoint
+            var temp = WaterAPI.GetClosestSurfacePoint(worldPosition, Agaris);
+
+            if ((temp-worldPosition).Length() < 50 && MapUtilities.IsAtFishLocation(worldPosition))
             {
 
                 var fuelId = new MyDefinitionId(typeof(MyObjectBuilder_ConsumableItem), "Fish");
@@ -71,7 +75,8 @@ namespace AaWFoodScript
 
                 if (inventory != null)
                 {
-                    float amount = 1;
+                    var random = new Random();
+                    float amount = random.Next(1,55);
 
                     if (_fishCollector.CubeGrid.GridSizeEnum == MyCubeSize.Large)
                         inventory.AddItems((MyFixedPoint)amount, fuelItem.Content);

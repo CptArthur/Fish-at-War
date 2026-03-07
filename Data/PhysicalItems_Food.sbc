@@ -17,8 +17,8 @@
 				<Y>0.14</Y>
 				<Z>0.14</Z>
 			</Size>
-			<Mass>4</Mass>
-			<Volume>3</Volume>
+			<Mass>11</Mass>
+			<Volume>10</Volume>
 			<Model>Models\Items\FoodContainer_Fruit.mwm</Model>
 			<PhysicalMaterial>Metal</PhysicalMaterial>
 			<Stats>
@@ -27,7 +27,7 @@
 			</Stats>
 
 			
-			<MinimalPricePerUnit>1240</MinimalPricePerUnit>
+			<MinimalPricePerUnit>500</MinimalPricePerUnit>
 			<MinimumOfferAmount>20</MinimumOfferAmount>
 			<MaximumOfferAmount>100</MaximumOfferAmount>
 			<MinimumOrderAmount>60</MinimumOrderAmount>
