@@ -14,11 +14,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\SEMods-Github\\Ares-at-War-part-1\\AaW Food\\AaWFoodScript\\AaWFoodScript.csproj",
+      "projectUniqueName": "D:\\SEMods-Github\\AaWFoodScript\\AaWFoodScript.csproj",
       "projectName": "AaWFoodScript",
-      "projectPath": "D:\\SEMods-Github\\Ares-at-War-part-1\\AaW Food\\AaWFoodScript\\AaWFoodScript.csproj",
+      "projectPath": "D:\\SEMods-Github\\AaWFoodScript\\AaWFoodScript.csproj",
       "packagesPath": "C:\\Users\\maart\\.nuget\\packages\\",
-      "outputPath": "D:\\SEMods-Github\\Ares-at-War-part-1\\AaW Food\\AaWFoodScript\\obj\\",
+      "outputPath": "D:\\SEMods-Github\\AaWFoodScript\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

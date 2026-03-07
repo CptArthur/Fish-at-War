@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AaWFoodScript")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+06a4de286e6d28a5a8825006ee8968e83c5bad90")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
 [assembly: System.Reflection.AssemblyProductAttribute("AaWFoodScript")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AaWFoodScript")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

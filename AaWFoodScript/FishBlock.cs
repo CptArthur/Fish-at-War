@@ -24,7 +24,7 @@ using Jakaria.API;
 
 namespace AaWFoodScript
 {
-    [MyEntityComponentDescriptor(typeof(MyObjectBuilder_FunctionalBlock), false, "LargeBlockFishNet", "SmallBlockFishNet")]
+    [MyEntityComponentDescriptor(typeof(MyObjectBuilder_FunctionalBlock), false, "AQD_LG_TrawlingNet")]
     public class FishCollectorComponent : MyGameLogicComponent
     { 
         private IMyFunctionalBlock _fishCollector;
