@@ -6,7 +6,7 @@
         <TypeId>FunctionalBlock</TypeId>
         <SubtypeId>AQD_LG_TrawlingNet</SubtypeId>
       </Id>
-      <DisplayName>Fish Net</DisplayName>
+      <DisplayName>{LOC:DisplayName_AQD_LG_TrawlingNet}</DisplayName>
       <Description>{LOC:Description_AQD_LG_TrawlingNet}</Description>
       <Icon>Textures\GUI\Icons\Cubes\AQD_LG_TrawlingNet.dds</Icon>
       <CubeSize>Large</CubeSize>
