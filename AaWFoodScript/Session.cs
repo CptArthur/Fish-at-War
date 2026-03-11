@@ -1,13 +1,15 @@
-﻿using System;
+﻿using Jakaria.API;
 using Sandbox.Definitions;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
+using System;
 using VRage.Game;
 using VRage.Game.Components;
 using VRage.Utils;
-using Jakaria.API;
-using BlendTypeEnum = VRageRender.MyBillboard.BlendTypeEnum; // required for MyTransparentGeometry/MySimpleObjectDraw to be able to set blend type.
+using Digi.NetworkLib;
+using BlendTypeEnum = VRageRender.MyBillboard.BlendTypeEnum;
+using VRage.ModAPI; // required for MyTransparentGeometry/MySimpleObjectDraw to be able to set blend type.
 
 namespace AaWFoodScript
 {
@@ -26,6 +28,13 @@ namespace AaWFoodScript
         //public readonly List<MyPlanet> Planets = new List<MyPlanet>(); // List of planets in the world
         bool isInit = false; // To ensure we only populate planets once
 
+        // Network and network packets
+        public const ushort NETWORK_ID = (ushort)(3680484848 % ushort.MaxValue); // Using the prod workshopId of the mod, which is 3680484848
+        public Network Net;
+        private TrawlingNetSettingsPacket _settingsPacket;
+        private TrawlingNetContentPacket _contentPacket;
+
+
         public override void LoadData()
         {
             // amogst the earliest execution points, but not everything is available at this point.
@@ -39,9 +48,81 @@ namespace AaWFoodScript
             // System.Diagnostics.Stopwatch - for measuring code execution time.
             // ...and many more things, ask in #programming-modding in keen's discord for what you want to do to be pointed at the available things to use.
 
+            Instance = this;
 
             WaterAPI.LoadData();
-            Instance = this;
+
+            SetupNetworkAndPackets(); 
+        }
+
+        private void SetupNetworkAndPackets()
+        {
+            Net = new Network(NETWORK_ID, ModContext.ModName);
+            Net.ExceptionHandler = (e) => MyLog.Default.WriteLine($"Network exception: {e}");
+            Net.ErrorHandler = (msg) => MyLog.Default.WriteLine($"Network error: {msg}");
+
+            Net.SerializeTest = true;
+
+            _settingsPacket = new TrawlingNetSettingsPacket();
+            _contentPacket = new TrawlingNetContentPacket();
+
+            TrawlingNetSettingsPacket.OnReceive += TrawlingNetSettingsPacketReceived;
+            TrawlingNetContentPacket.OnReceive += TrawlingNetContentPacketReceived;
+        }
+
+        // Used by the logic components to sync settings to the server
+        public void SendTrawlingNetSettingsPacketSetting(long entityId, TrawlingNetSettings settings)
+        {
+            _settingsPacket.Setup(entityId, settings);
+            Net.SendToServer(_settingsPacket);
+        }
+
+        public void SendTrawlingNetContentPacketSetting(long entityId, float content)
+        {
+            _contentPacket.Setup(entityId, content);
+            Net.SendToServer(_contentPacket);
+        }
+
+
+        void TrawlingNetSettingsPacketReceived(TrawlingNetSettingsPacket packet, ref PacketInfo packetInfo, ulong senderSteamId)
+        {
+            IMyEntity ent = MyEntities.GetEntityById(packet.EntityId);
+            if (ent == null)
+            {
+                // log some error if this is unexpected, but do remember that clients do NOT have all entities available to them, only server does.
+                return;
+            }
+
+            // from here if you have a gamelogic component on that entity you can do something like:
+            var logic = ent.GameLogic?.GetAs<FishCollectorComponent>();
+            if (logic == null)
+            {
+                return;
+            }
+
+            // Set the settings on the gamelogic here
+            logic.UpdateSettingsFromInput(packet.PacketSettings);
+
+            // to see how this works in practice, try it in both singleplayer (you're the server) and as a MP client in a dedicated server (you can start one from steam tools).
+            packetInfo.Relay = RelayMode.ToEveryone;
+
+        }
+
+        void TrawlingNetContentPacketReceived(TrawlingNetContentPacket packet, ref PacketInfo packetInfo, ulong senderSteamId)
+        {
+            IMyEntity ent = MyEntities.GetEntityById(packet.EntityId);
+            if (ent == null)
+            {
+                // log some error if this is unexpected, but do remember that clients do NOT have all entities available to them, only server does.
+                return;
+            }
+            var logic = ent.GameLogic?.GetAs<FishCollectorComponent>();
+            if (logic == null)
+            {
+                return;
+            }
+            logic.NetContent = packet.NetContent;
+            packetInfo.Relay = RelayMode.ToEveryone;
         }
 
         public override void BeforeStart()
