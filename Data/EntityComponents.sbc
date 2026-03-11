@@ -1,39 +1,53 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <EntityComponents>
-
-    <EntityComponent xsi:type="MyObjectBuilder_InventoryComponentDefinition">
-      <Id>
-        <TypeId>Inventory</TypeId>
-        <SubtypeId>FishNetLarge</SubtypeId>
-      </Id>
-      <Size x="2.5" y="2.5" z="2.5" />
-      <InputConstraint Whitelist="true" Description="Fish, valiantly slain!" Icon="Textures\GUI\Icons\Filter_Algae.dds">
-        <Entry>
-          <TypeId>ConsumableItem</TypeId>
-          <SubtypeId>Fish</SubtypeId>
-        </Entry>
-      </InputConstraint>
-      <CanSend>true</CanSend>
-      <CanReceive>true</CanReceive>
-    </EntityComponent>
-
-    <EntityComponent xsi:type="MyObjectBuilder_ConveyorEndpointComponentDefinition">
-      <Id>
-        <TypeId>ConveyorEndpointComponent</TypeId>
-        <SubtypeId>FishNet</SubtypeId>
-      </Id>
-      <AllowSelfPulling>false</AllowSelfPulling>
-    </EntityComponent>
-
-    <EntityComponent xsi:type="MyObjectBuilder_ResourceSinkComponentDefinition">
-      <Id>
-        <TypeId>ResourceSinkComponent</TypeId>
-        <SubtypeId>FishNet_ResourceSink</SubtypeId>
-      </Id>
-      <PowerConsumption>0.1</PowerConsumption>
-      <ResourceSinkGroup>Utility</ResourceSinkGroup>
-    </EntityComponent>
-
-  </EntityComponents>
+	<EntityComponents>
+		<EntityComponent xsi:type="MyObjectBuilder_InventoryComponentDefinition">
+			<Id>
+				<TypeId>Inventory</TypeId>
+				<SubtypeId>FishNetLarge</SubtypeId>
+			</Id>
+			<Size x="2.5" y="2.5" z="2.5"/>
+			<InputConstraint Whitelist="true" Description="Fish, valiantly slain!" Icon="Textures\GUI\Icons\Filter_Algae.dds">
+				<Entry>
+					<TypeId>ConsumableItem</TypeId>
+					<SubtypeId>Fish</SubtypeId>
+				</Entry>
+			</InputConstraint>
+			<CanSend>true</CanSend>
+			<CanReceive>true</CanReceive>
+		</EntityComponent>
+		<EntityComponent xsi:type="MyObjectBuilder_ConveyorEndpointComponentDefinition">
+			<Id>
+				<TypeId>ConveyorEndpointComponent</TypeId>
+				<SubtypeId>FishNet</SubtypeId>
+			</Id>
+			<AllowSelfPulling>false</AllowSelfPulling>
+		</EntityComponent>
+		<EntityComponent xsi:type="MyObjectBuilder_ResourceSinkComponentDefinition">
+			<Id>
+				<TypeId>ResourceSinkComponent</TypeId>
+				<SubtypeId>FishNet_ResourceSink</SubtypeId>
+			</Id>
+			<PowerConsumption>0.1</PowerConsumption>
+			<ResourceSinkGroup>Utility</ResourceSinkGroup>
+		</EntityComponent>
+		<EntityComponent xsi:type="MyObjectBuilder_ModStorageComponentDefinition">
+			<Id>
+				<TypeId>ModStorageComponent</TypeId>
+				<SubtypeId>FishAtWarStorage</SubtypeId>
+			</Id>
+			<RegisteredStorageGuids>
+				<guid>7275d81b-965f-318b-e20f-efb4c23480b9</guid>
+			</RegisteredStorageGuids>
+		</EntityComponent>
+		<EntityComponent xsi:type="MyObjectBuilder_ModStorageComponentDefinition">
+			<Id>
+				<TypeId>ModStorageComponent</TypeId>
+				<SubtypeId>FishAtWarContent</SubtypeId>
+			</Id>
+			<RegisteredStorageGuids>
+				<guid>7275d81b-965f-318b-e20f-efb4c23480c0</guid>
+			</RegisteredStorageGuids>
+		</EntityComponent>
+	</EntityComponents>
 </Definitions>
