@@ -26,5 +26,14 @@
       <AllowSelfPulling>false</AllowSelfPulling>
     </EntityComponent>
 
+    <EntityComponent xsi:type="MyObjectBuilder_ResourceSinkComponentDefinition">
+      <Id>
+        <TypeId>ResourceSinkComponent</TypeId>
+        <SubtypeId>FishNet_ResourceSink</SubtypeId>
+      </Id>
+      <PowerConsumption>0.1</PowerConsumption>
+      <ResourceSinkGroup>Utility</ResourceSinkGroup>
+    </EntityComponent>
+
   </EntityComponents>
 </Definitions>

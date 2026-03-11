@@ -10,6 +10,7 @@
       <DefaultComponents>
         <Component BuilderType="MyObjectBuilder_Inventory" SubtypeId="FishNetLarge" ForceCreate="true"/>
         <Component BuilderType="MyObjectBuilder_ConveyorEndpointComponent" SubtypeId="FishNet" ForceCreate="true"/>
+        <Component BuilderType="MyObjectBuilder_ResourceSinkComponentDefinition" SubtypeId="FishNet_ResourceSink" ForceCreate="true"/>
       </DefaultComponents>
     </Container>
 
