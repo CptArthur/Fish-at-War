@@ -77,7 +77,7 @@ namespace AaWFoodScript
             Net.SendToServer(_settingsPacket);
         }
 
-        public void SendTrawlingNetContentPacketSetting(long entityId, float content)
+        public void SendTrawlingNetContentPacketSetting(long entityId, TrawlingNetContent content)
         {
             _contentPacket.Setup(entityId, content);
             Net.SendToServer(_contentPacket);
@@ -121,7 +121,7 @@ namespace AaWFoodScript
             {
                 return;
             }
-            logic.NetContent = packet.NetContent;
+            logic.NetContent = packet.PacketContent.NetContent;
             packetInfo.Relay = RelayMode.ToEveryone;
         }
 

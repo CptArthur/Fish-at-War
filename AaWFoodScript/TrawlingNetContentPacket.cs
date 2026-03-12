@@ -12,14 +12,14 @@ namespace AaWFoodScript
         [ProtoMember(1)]
         public long EntityId;
 
-        [ProtoMember(2)]
-        public float NetContent;
+        [ProtoMember(3)]
+        public TrawlingNetContent PacketContent;
 
-        public void Setup(long entityId, float netContent)
+        public void Setup(long entityId, TrawlingNetContent packetContent)
         {
             // Ensure you assign ALL the protomember fields here to avoid problems.
             EntityId = entityId;
-            NetContent = netContent;
+            PacketContent = packetContent;
         }
 
         // Alternative way of handling the data elsewhere.
@@ -32,5 +32,16 @@ namespace AaWFoodScript
         }
     }
 
+    [ProtoContract]
+    public class TrawlingNetContent
+    {
+
+        /// <summary>
+        /// Content of the trawling net
+        /// </summary>
+        [ProtoMember(1)]
+        public float NetContent;
 
     }
+
+}
