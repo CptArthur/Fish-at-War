@@ -27,13 +27,12 @@ namespace AaWFoodScript
         static bool Done = false;
         private AaWFood_Session Session => AaWFood_Session.Instance; // helper to access the session component instance, which is where shared state and the network handler live
 
-        public static void DoOnce(IMyModContext context) // called by NavigationScreen_GameLogic.cs
+        public static void DoOnce(IMyModContext context)
         {
             if (Done)
                 return;
             Done = true;
 
-            // these are all the options and they're not all required so use only what you need.
             CreateControls();
             CreateActions(context);
         }
@@ -48,41 +47,24 @@ namespace AaWFoodScript
         static void CreateControls()
         {
             {
-                var c = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlSeparator, IMyMotorSuspension>(""); // separators don't store the id
+                var c = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlSeparator, IMyFunctionalBlock>(""); // separators don't store the id
                 c.SupportsMultipleBlocks = false;
                 c.Visible = CustomVisibleCondition;
 
-                MyAPIGateway.TerminalControls.AddControl<IMyMotorSuspension>(c);
+                MyAPIGateway.TerminalControls.AddControl<IMyFunctionalBlock>(c);
             }
             {
-                var c = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlLabel, IMyMotorSuspension>(IdPrefix + "MainLabel");
+                var c = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlLabel, IMyFunctionalBlock>(IdPrefix + "MainLabel");
                 c.Label = MyStringId.GetOrCompute("Net Settings");
                 c.SupportsMultipleBlocks = true;
                 c.Visible = CustomVisibleCondition;
 
-                MyAPIGateway.TerminalControls.AddControl<IMyMotorSuspension>(c);
+                MyAPIGateway.TerminalControls.AddControl<IMyFunctionalBlock>(c);
             }
-            
-            //{
-            //    var c = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlButton, IMyMotorSuspension>(IdPrefix + "Help");
-            //    c.Title = MyStringId.GetOrCompute("Help");
-            //    c.Tooltip = MyStringId.GetOrCompute("Sends you to the steam help page.");
-            //    c.SupportsMultipleBlocks = false;
-            //    c.Visible = b =>
-            //    {
-            //        var logic = b?.GameLogic?.GetAs<NavigationScreen_GameLogic>();
-            //        return CustomVisibleCondition(b) && (logic?.NavigationScreenEnableZoom ?? false); // only visible if the zoom is enabled
-            //    };
 
-            //    c.Action = (b) => {
-                    
-            //        MyVisualScriptLogicProvider.OpenSteamOverlayLocal("https://steamcommunity.com/sharedfiles/filedetails/?id=3536587404");
-            //    };
 
-            //    MyAPIGateway.TerminalControls.AddControl<IMyMotorSuspension>(c);
-            //}
             {
-                var c = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlOnOffSwitch, IMyMotorSuspension>(IdPrefix + "EnableFishing");
+                var c = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlOnOffSwitch, IMyFunctionalBlock>(IdPrefix + "EnableFishing");
                 c.Title = MyStringId.GetOrCompute("Enable fishing");
                 c.Tooltip = MyStringId.GetOrCompute("Allows you to enable or disable fishing.");
                 c.SupportsMultipleBlocks = true;
@@ -106,14 +88,30 @@ namespace AaWFoodScript
                     logic.EnableFishing = v;
                 };
 
-                MyAPIGateway.TerminalControls.AddControl<IMyMotorSuspension>(c);
+                MyAPIGateway.TerminalControls.AddControl<IMyFunctionalBlock>(c);
+            }
+
+            {
+                var c = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlButton, IMyFunctionalBlock>(IdPrefix + "Help");
+                c.Title = MyStringId.GetOrCompute("Help");
+                c.Tooltip = MyStringId.GetOrCompute("Sends you to the steam help page.");
+                c.SupportsMultipleBlocks = false;
+                c.Visible = CustomVisibleCondition;
+
+                c.Action = (b) =>
+                {
+
+                    MyVisualScriptLogicProvider.OpenSteamOverlayLocal("https://steamcommunity.com/sharedfiles/filedetails/?id=3680484848");
+                };
+
+                MyAPIGateway.TerminalControls.AddControl<IMyFunctionalBlock>(c);
             }
 
         }
         static void CreateActions(IMyModContext context)
         {
             {
-                var a = MyAPIGateway.TerminalControls.CreateAction<IMyMotorSuspension>(IdPrefix + "ToggleEnableFishingAction");
+                var a = MyAPIGateway.TerminalControls.CreateAction<IMyFunctionalBlock>(IdPrefix + "ToggleEnableFishingAction");
 
                 a.Name = new StringBuilder("Toggle fishing");
                 a.ValidForGroups = true;
@@ -133,7 +131,7 @@ namespace AaWFoodScript
                 };
                 a.Enabled = CustomVisibleCondition;
 
-                MyAPIGateway.TerminalControls.AddAction<IMyMotorSuspension>(a);
+                MyAPIGateway.TerminalControls.AddAction<IMyFunctionalBlock>(a);
             }
 
 
