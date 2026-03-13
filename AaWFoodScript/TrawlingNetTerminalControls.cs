@@ -65,8 +65,8 @@ namespace AaWFoodScript
 
             {
                 var c = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlOnOffSwitch, IMyFunctionalBlock>(IdPrefix + "EnableFishing");
-                c.Title = MyStringId.GetOrCompute("Enable fishing");
-                c.Tooltip = MyStringId.GetOrCompute("Allows you to enable or disable fishing.");
+                c.Title = MyStringId.GetOrCompute("Deploy fishing net");
+                c.Tooltip = MyStringId.GetOrCompute("Allows you to set or haul in the fishing net.");
                 c.SupportsMultipleBlocks = true;
                 c.Visible = CustomVisibleCondition;
 
