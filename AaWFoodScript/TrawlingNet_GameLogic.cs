@@ -453,7 +453,16 @@ namespace AaWFoodScript
             catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in AppendCustomInfo!\n{e}"); }
         }
 
-        private static readonly string[] SpinnerFrames = { "|", "/", "-", "\\" };
+        private static readonly string[] SpinnerFrames = {
+            "|....",
+            ".|...",
+            "..|..",
+            "...|.",
+            "....|",
+            "...|.",
+            "..|..",
+            ".|..."
+        };
 
         private string GetSpinner()
         {
