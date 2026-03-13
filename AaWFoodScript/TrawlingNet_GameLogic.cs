@@ -1,4 +1,5 @@
 ﻿using Jakaria.API;
+using PEPCO.Utilities;
 using ProtoBuf;
 using Sandbox.Common.ObjectBuilders;
 using Sandbox.Definitions;
@@ -12,6 +13,7 @@ using Sandbox.ModAPI.Interfaces.Terminal;
 using SpaceEngineers.Game.ModAPI;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Xml.Serialization;
 using VRage;
@@ -25,7 +27,6 @@ using VRage.ObjectBuilders;
 using VRage.Serialization;
 using VRage.Utils;
 using VRageMath;
-using PEPCO.Utilities;
 using static PEPCO.ScriptHelpers;
 
 namespace AaWFoodScript
@@ -111,7 +112,7 @@ namespace AaWFoodScript
             }
         }
 
-        public bool IsAtFishLocation // Cached value to avoid repeated checks in the UI
+        public bool IsInFishLocation // Cached value to avoid repeated checks in the UI
         {
             get { return Content.IsInFishLocation; }
             set
@@ -247,9 +248,9 @@ namespace AaWFoodScript
                 double distToSurfaceSq = (temp - worldPosition).LengthSquared();
 
                 // Cache for UI
-                IsAtFishLocation = MapUtilities.IsAtFishLocation(worldPosition);
+                IsInFishLocation = MapUtilities.IsAtFishLocation(worldPosition);
 
-                if (distToSurfaceSq < (50d * 50d) && IsAtFishLocation)
+                if (distToSurfaceSq < (50d * 50d) && IsInFishLocation)
                 {
                     float? actualVelocity = _fishCollector.CubeGrid?.LinearVelocity.LengthSquared();
                     if (actualVelocity == null) return;
@@ -408,11 +409,12 @@ namespace AaWFoodScript
         {
             try
             {
+                string spinner = GetSpinner();
                 // Calculate content percentage
                 float contentPercentage = (NetContent / MAX_NET_CONTENT) * 100f;
-                
-                info.AppendLine("--- Trawling Status ---");
-                info.AppendLine($"Net Content: ({contentPercentage:F2}%)");
+
+                info.AppendLine($"--- Trawling Status {spinner} ---"); // Spinner in the header
+                info.AppendLine($"Net Content: {contentPercentage.ToString("00.00")}%");
                 if (!_fishCollector.IsFunctional)
                 {
                     info.AppendLine("Status: Net damaged");
@@ -425,7 +427,7 @@ namespace AaWFoodScript
                 }
                 if (EnableFishing)
                 {
-                    if (IsAtFishLocation)
+                    if (IsInFishLocation)
                     {
                         info.AppendLine("Status: Net set");
                         info.AppendLine($"Current catch: {GetDisplayName(Content.NetContentSubtypeId) ?? Content.NetContentSubtypeId}");
@@ -449,6 +451,15 @@ namespace AaWFoodScript
                 }
             }
             catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in AppendCustomInfo!\n{e}"); }
+        }
+
+        private static readonly string[] SpinnerFrames = { "|", "/", "-", "\\" };
+
+        private string GetSpinner()
+        {
+            // Cycle every 10 ticks (approx 6 times a second)
+            int frame = (MyAPIGateway.Session.GameplayFrameCounter / 10) % SpinnerFrames.Length;
+            return SpinnerFrames[frame];
         }
 
         // --- Data Persistence and Sync (Kept Intact) ---
