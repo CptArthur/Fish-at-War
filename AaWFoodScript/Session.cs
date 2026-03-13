@@ -8,6 +8,7 @@ using VRage.Game;
 using VRage.Game.Components;
 using VRage.Utils;
 using Digi.NetworkLib;
+using static PEPCO.ScriptHelpers;
 using BlendTypeEnum = VRageRender.MyBillboard.BlendTypeEnum;
 using VRage.ModAPI; // required for MyTransparentGeometry/MySimpleObjectDraw to be able to set blend type.
 
@@ -21,12 +22,10 @@ namespace AaWFoodScript
     // The MyUpdateOrder arg determines what update overrides are actually called.
     // Remove any method that you don't need, none of them are required, they're only there to show what you can use.
     // Also remove all comments you've read to avoid the overload of comments that is this file.
-    [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation | MyUpdateOrder.AfterSimulation)]
+    [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
     public class AaWFood_Session : MySessionComponentBase
     {
         public static AaWFood_Session Instance; // the only way to access session comp from other classes and the only accepted static field.
-        //public readonly List<MyPlanet> Planets = new List<MyPlanet>(); // List of planets in the world
-        bool isInit = false; // To ensure we only populate planets once
 
         // Network and network packets
         public const ushort NETWORK_ID = (ushort)(3680484848 % ushort.MaxValue); // Using the prod workshopId of the mod, which is 3680484848
@@ -110,18 +109,26 @@ namespace AaWFoodScript
 
         void TrawlingNetContentPacketReceived(TrawlingNetContentPacket packet, ref PacketInfo packetInfo, ulong senderSteamId)
         {
+            LogDebug($"AQD_LG_TrawlingNet Session: TrawlingNetContentPacketReceived; EntityId={packet.EntityId}; NetContent={packet.PacketContent?.NetContent}; EmptyNet={packet.PacketContent?.EmptyNet}; SubtypeId={packet.PacketContent?.NetContentSubtypeId}; sender={senderSteamId}");
+
             IMyEntity ent = MyEntities.GetEntityById(packet.EntityId);
             if (ent == null)
             {
+                // LogDebug($"AQD_LG_TrawlingNet Session: TrawlingNetContentPacketReceived: entity not found for EntityId={packet.EntityId}");
                 // log some error if this is unexpected, but do remember that clients do NOT have all entities available to them, only server does.
                 return;
             }
             var logic = ent.GameLogic?.GetAs<FishCollectorComponent>();
             if (logic == null)
             {
+                LogDebug($"AQD_LG_TrawlingNet Session: TrawlingNetContentPacketReceived: FishCollectorComponent not found on entity EntityId={packet.EntityId}");
                 return;
             }
-            logic.NetContent = packet.PacketContent.NetContent;
+
+            LogDebug($"AQD_LG_TrawlingNet Session: TrawlingNetContentPacketReceived: calling UpdateNetContentFromInput; EntityId={packet.EntityId}");
+            // Set the content on the gamelogic here
+            logic.UpdateNetContentFromInput(packet.PacketContent);
+
             packetInfo.Relay = RelayMode.ToEveryone;
         }
 

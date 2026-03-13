@@ -42,6 +42,39 @@ namespace AaWFoodScript
         [ProtoMember(1)]
         public float NetContent;
 
+
+        /// <summary>
+        /// The subtype of the content, for example "Fish", in the future I hope Enenra also adds Lobsters 🦞
+        /// </summary>
+        [ProtoMember(2)]
+        public string NetContentSubtypeId;
+
+        /// <summary>
+        /// Defaults to false, if true the net is to be emptied and the content needs to be transfered to inventory on server and clients - I think?
+        /// </summary>
+        [ProtoMember(3)]
+        public bool EmptyNet;
+
+
+        /// <summary>
+        /// Whether the net is currently in a fish location, used to determine if it should be catching fish or not
+        /// </summary>
+        [ProtoMember(4)]
+        public bool IsInFishLocation;
+
+
+        /// <summary>
+        /// The current speed of the boat squared for easier comparison with the max speed squared, used to determine catch efficiency
+        /// </summary>
+        [ProtoMember(5)]
+        public float LastSpeedSq;
+
+
+        /// <summary>
+        /// The number of fish caught in the last catch attempt
+        /// </summary>
+        [ProtoMember(6)]
+        public float LastCaught;
     }
 
 }
