@@ -7,7 +7,7 @@ SEWT = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\SpaceEngineers\\Bin64
 MODS_DIR = "SpaceEngineers\\Mods"
 
 EXCLUDE_FILES = [".bat", ".psd", ".md", ".py", ".gitattributes", ".gitignore", ".sln", ".csproj", ".mod", ".sbmi"]
-EXCLUDE_DIRS = ["bin", "obj", "WebWiki", ".git", "_WIP", "AaWFoodScript"]
+EXCLUDE_DIRS = ["bin", "obj", "WebWiki", ".git"]
 
 UPLOAD_DESC = True
 UPLOAD_PN = True
