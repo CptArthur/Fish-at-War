@@ -14,7 +14,7 @@ UPLOAD_PN = True
 
 TAGS = ["Script", "AAW", "Block", "Other"]
 
-MOD_NAME_OVERRIDE = ""
+MOD_NAME_OVERRIDE = "Fish at War"
 
 DRY_RUN = False
 
