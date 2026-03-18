@@ -127,4 +127,17 @@
     <comment/>
   </data>
 
+  <data name="DisplayName_FAW_Item_Fish1" xml:space="preserve">
+    <value>Duskflicker</value>
+    <comment/>
+  </data>
+  <data name="DisplayName_FAW_Item_Fish2" xml:space="preserve">
+    <value>Starstial</value>
+    <comment/>
+  </data>
+  <data name="DisplayName_FAW_Item_Fish3" xml:space="preserve">
+    <value>Zorplax Snapper</value>
+    <comment/>
+  </data>
+
 </root>

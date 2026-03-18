@@ -1,43 +1,130 @@
 <?xml version="1.0"?>
 <Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-	<PhysicalItems>
+  <PhysicalItems>
 
+    <PhysicalItem xsi:type="MyObjectBuilder_ConsumableItemDefinition">
+      <Id>
+        <TypeId>ConsumableItem</TypeId>
+        <SubtypeId>Fish</SubtypeId>
+      </Id>
+      <DisplayName>Fish</DisplayName>
+      <Description>Description_Meat</Description>
+      <Icon>Textures\GUI\Icons\FoodContainer_Fish.dds</Icon>
+      <Size>
+        <X>0.14</X>
+        <Y>0.14</Y>
+        <Z>0.14</Z>
+      </Size>
+      <Mass>11</Mass>
+      <Volume>10</Volume>
+      <Model>Models\Items\FoodContainer_Fruit.mwm</Model>
+      <PhysicalMaterial>Metal</PhysicalMaterial>
+      <Stats>
+        <Stat Name="Health" Value ="0.01" Time="10"/>
+        <Stat Name="Food" Value ="0.002" Time="30"/>
+      </Stats>
+      <MinimalPricePerUnit>500</MinimalPricePerUnit>
+      <MinimumOfferAmount>20</MinimumOfferAmount>
+      <MaximumOfferAmount>100</MaximumOfferAmount>
+      <MinimumOrderAmount>60</MinimumOrderAmount>
+      <MaximumOrderAmount>200</MaximumOrderAmount>
+      <CanPlayerOrder>true</CanPlayerOrder>
+      <MinimumAcquisitionAmount>5</MinimumAcquisitionAmount>
+      <MaximumAcquisitionAmount>25</MaximumAcquisitionAmount>
+    </PhysicalItem>
 
+    <PhysicalItem xsi:type="MyObjectBuilder_ConsumableItemDefinition">
+      <Id>
+        <TypeId>ConsumableItem</TypeId>
+        <SubtypeId>FAW_Item_Fish1</SubtypeId>
+      </Id>
+      <DisplayName>DisplayName_FAW_Item_Fish1</DisplayName>
+      <Description>Description_Meat</Description>
+      <Icon>Textures\GUI\Icons\FAW_Item_Fish1.dds</Icon>
+      <Size>
+        <X>0.16</X>
+        <Y>1.4</Y>
+        <Z>0.68</Z>
+      </Size>
+      <Mass>11</Mass>
+      <Volume>10</Volume>
+      <Model>Models\Fish\Fish1.mwm</Model>
+      <PhysicalMaterial>Metal</PhysicalMaterial>
+      <Stats>
+        <Stat Name="Health" Value ="0.01" Time="10"/>
+        <Stat Name="Food" Value ="0.002" Time="30"/>
+      </Stats>
+      <MinimalPricePerUnit>500</MinimalPricePerUnit>
+      <MinimumOfferAmount>20</MinimumOfferAmount>
+      <MaximumOfferAmount>100</MaximumOfferAmount>
+      <MinimumOrderAmount>60</MinimumOrderAmount>
+      <MaximumOrderAmount>200</MaximumOrderAmount>
+      <CanPlayerOrder>true</CanPlayerOrder>
+      <MinimumAcquisitionAmount>5</MinimumAcquisitionAmount>
+      <MaximumAcquisitionAmount>25</MaximumAcquisitionAmount>
+    </PhysicalItem>
 
-		<PhysicalItem xsi:type="MyObjectBuilder_ConsumableItemDefinition">
-			<Id>
-				<TypeId>ConsumableItem</TypeId>
-				<SubtypeId>Fish</SubtypeId>
-			</Id>
-			<DisplayName>Fish</DisplayName>
-			<Description>Description_Meat</Description>
-			<Icon>Textures\GUI\Icons\FoodContainer_Fish.dds</Icon>
-			<Size>
-				<X>0.14</X>
-				<Y>0.14</Y>
-				<Z>0.14</Z>
-			</Size>
-			<Mass>11</Mass>
-			<Volume>10</Volume>
-			<Model>Models\Items\FoodContainer_Fruit.mwm</Model>
-			<PhysicalMaterial>Metal</PhysicalMaterial>
-			<Stats>
-				<Stat Name="Health" Value ="0.01" Time="10"/>
-				<Stat Name="Food" Value ="0.002" Time="30"/>
-			</Stats>
+    <PhysicalItem xsi:type="MyObjectBuilder_ConsumableItemDefinition">
+      <Id>
+        <TypeId>ConsumableItem</TypeId>
+        <SubtypeId>FAW_Item_Fish2</SubtypeId>
+      </Id>
+      <DisplayName>DisplayName_FAW_Item_Fish2</DisplayName>
+      <Description>Description_Meat</Description>
+      <Icon>Textures\GUI\Icons\FAW_Item_Fish2.dds</Icon>
+      <Size>
+        <X>0.17</X>
+        <Y>2.07</Y>
+        <Z>0.69</Z>
+      </Size>
+      <Mass>11</Mass>
+      <Volume>10</Volume>
+      <Model>Models\Fish\Fish2.mwm</Model>
+      <PhysicalMaterial>Metal</PhysicalMaterial>
+      <Stats>
+        <Stat Name="Health" Value ="0.01" Time="10"/>
+        <Stat Name="Food" Value ="0.002" Time="30"/>
+      </Stats>
+      <MinimalPricePerUnit>500</MinimalPricePerUnit>
+      <MinimumOfferAmount>20</MinimumOfferAmount>
+      <MaximumOfferAmount>100</MaximumOfferAmount>
+      <MinimumOrderAmount>60</MinimumOrderAmount>
+      <MaximumOrderAmount>200</MaximumOrderAmount>
+      <CanPlayerOrder>true</CanPlayerOrder>
+      <MinimumAcquisitionAmount>5</MinimumAcquisitionAmount>
+      <MaximumAcquisitionAmount>25</MaximumAcquisitionAmount>
+    </PhysicalItem>
 
+    <PhysicalItem xsi:type="MyObjectBuilder_ConsumableItemDefinition">
+      <Id>
+        <TypeId>ConsumableItem</TypeId>
+        <SubtypeId>FAW_Item_Fish3</SubtypeId>
+      </Id>
+      <DisplayName>DisplayName_FAW_Item_Fish3</DisplayName>
+      <Description>Description_Meat</Description>
+      <Icon>Textures\GUI\Icons\FAW_Item_Fish3.dds</Icon>
+      <Size>
+        <X>0.35</X>
+        <Y>3.35</Y>
+        <Z>1.28</Z>
+      </Size>
+      <Mass>11</Mass>
+      <Volume>10</Volume>
+      <Model>Models\Fish\Fish3.mwm</Model>
+      <PhysicalMaterial>Metal</PhysicalMaterial>
+      <Stats>
+        <Stat Name="Health" Value ="0.01" Time="10"/>
+        <Stat Name="Food" Value ="0.002" Time="30"/>
+      </Stats>
+      <MinimalPricePerUnit>500</MinimalPricePerUnit>
+      <MinimumOfferAmount>20</MinimumOfferAmount>
+      <MaximumOfferAmount>100</MaximumOfferAmount>
+      <MinimumOrderAmount>60</MinimumOrderAmount>
+      <MaximumOrderAmount>200</MaximumOrderAmount>
+      <CanPlayerOrder>true</CanPlayerOrder>
+      <MinimumAcquisitionAmount>5</MinimumAcquisitionAmount>
+      <MaximumAcquisitionAmount>25</MaximumAcquisitionAmount>
+    </PhysicalItem>
 
-			<MinimalPricePerUnit>500</MinimalPricePerUnit>
-			<MinimumOfferAmount>20</MinimumOfferAmount>
-			<MaximumOfferAmount>100</MaximumOfferAmount>
-			<MinimumOrderAmount>60</MinimumOrderAmount>
-			<MaximumOrderAmount>200</MaximumOrderAmount>
-			<CanPlayerOrder>true</CanPlayerOrder>
-
-			<MinimumAcquisitionAmount>5</MinimumAcquisitionAmount>
-			<MaximumAcquisitionAmount>25</MaximumAcquisitionAmount>
-		</PhysicalItem>
-
-
-	</PhysicalItems>
+  </PhysicalItems>
 </Definitions>
