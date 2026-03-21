@@ -10,6 +10,7 @@ using Sandbox.Game.GameSystems;
 using Sandbox.ModAPI;
 using Sandbox.ModAPI.Interfaces;
 using Sandbox.ModAPI.Interfaces.Terminal;
+using SISK.LoadLocalization;
 using SpaceEngineers.Game.ModAPI;
 using System;
 using System.Collections.Generic;
@@ -29,7 +30,7 @@ using VRage.Utils;
 using VRageMath;
 using static PEPCO.ScriptHelpers;
 
-namespace AaWFoodScript
+namespace PEPCO
 {
     [MyEntityComponentDescriptor(typeof(MyObjectBuilder_FunctionalBlock), false, "AQD_LG_TrawlingNet")]
     public class FishCollectorComponent : MyGameLogicComponent
@@ -38,7 +39,8 @@ namespace AaWFoodScript
 
         public IMyTerminalBlock Block { get; private set; }
         private IMyFunctionalBlock _fishCollector;
-        private int count = 0;
+        private int counter = 0;
+        
         private Random _random;
 
         private const double SpeedLowSq = 10 * 10;    // 100
@@ -64,9 +66,17 @@ namespace AaWFoodScript
         private const int ESCAPE_MIN = 1;
         private const int ESCAPE_MAX = 10;
 
+        private int _deckFishVisualState = 0; // 0-4 for the 5 visual states of the fish deck subpart, which will change based on how full the net is. For now we will just set it to 0 and not implement the visual states until later when we have more fish types and a better idea of how we want to visualize them.
+        private int _deckFishVisibleTicks = 0; // Counter to keep the fish on deck visible for a short time after hauling in the net, to give the player some visual feedback of what they caught before it disappears. Will be reset to a certain value (e.g. 100 ticks = ~1.5 seconds) whenever we haul in the net, and will count down every tick in UpdateSubpartVisibility, hiding the fish deck subpart again when it reaches 0.
 
-        private const string SUBPART_NAME = "net";
-        private MyEntitySubpart _cachedNetSubpart;
+        private const string SUBPART_NAME_NET = "subpart_net";
+        private const string SUBPART_NAME_FISH_DECK = "fish";
+        private static readonly string[] SUBPART_NAME_FISH_DECK_FISH = { "fish_1", "fish_2", "fish_3", "fish_4", "fish_5" }; // Example subpart names for different fish deck visual states, will need to be updated based on the actual models
+        private List<string> _currentVisibleFish = new List<string>();
+        private IMyEntity _spawnedNetVisual;
+        private Matrix _spawnedNetLocalMatrix;
+
+        private readonly Dictionary<string, MyEntitySubpart> _cachedSubparts = new Dictionary<string, MyEntitySubpart>();
 
         public bool EnableFishing
         {
@@ -78,7 +88,7 @@ namespace AaWFoodScript
                 Settings.EnableFishing = value;
 
                 // Trigger visibility change immediately when toggled
-                RefreshSubpartVisibility();
+                SetSubpartVisibility(SUBPART_NAME_NET, value, Block as IMyEntity);
                 if (!value)
                 {
                     // If we're hauling in the net, we want to transfer the content to inventory immediately, so we trigger a net content sync with the emptyNet flag set to true, which will cause the inventory transfer
@@ -176,11 +186,28 @@ namespace AaWFoodScript
                 LoadNetContent();
                 SaveNetContent();
 
-                TrawlingNetTerminalControls.DoOnce(ModContext);
+                TrawlingNet_TerminalControls.DoOnce(ModContext);
 
                 Block.AppendingCustomInfo += AppendCustomInfo;
 
-                NeedsUpdate |= MyEntityUpdateEnum.EACH_10TH_FRAME;
+                // Calculate the correct folder path for the model "\Models\Cubes\large\AQD_LG_TrawlingNet_Subpart_Net.mwm"
+                string pathToModel = "";
+                if (GetFullModPathSafe("Models\\Cubes\\large\\AQD_LG_TrawlingNet_Subpart_Net.mwm", ModContext, out pathToModel))
+                {
+                    LogDebug($"AQD_LG_TrawlingNet: Model path resolved successfully: {pathToModel}");
+                }
+                else
+                {
+                    LogError($"AQD_LG_TrawlingNet: Failed to resolve model path for net subpart! Path attempted: Models\\Cubes\\large\\AQD_LG_TrawlingNet_Subpart_Net.mwm");
+                }
+
+                // Set the net subpart to the correct dummy
+                _spawnedNetVisual = AddModelToDummy(Block as IMyEntity, SUBPART_NAME_NET, pathToModel);
+                _spawnedNetVisual.Visible = true;
+
+
+                //NeedsUpdate |= MyEntityUpdateEnum.EACH_10TH_FRAME;
+                NeedsUpdate |= MyEntityUpdateEnum.EACH_FRAME;
                 if (MyAPIGateway.Session.IsServer)
                 {
                     NeedsUpdate |= MyEntityUpdateEnum.EACH_100TH_FRAME;
@@ -189,87 +216,327 @@ namespace AaWFoodScript
             catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in UpdateOnceBeforeFrame!\n{e}"); }
         }
 
-        public override void UpdateAfterSimulation10()
+        /// <summary>
+        /// Main update loop running every simulation frame.
+        /// Distributes tasks across different frames to prevent performance spikes (Load Balancing).
+        /// </summary>
+        public override void UpdateAfterSimulation()
+        {
+            if (!IsDedicatedServer())
+            {
+                // Update the net visual every tick
+                UpdateNetMatrixManual();
+
+                // update net entity visual
+                if (EnableFishing != _spawnedNetVisual.Render.Visible)
+                {
+                    _spawnedNetVisual.Render.Visible = EnableFishing;
+                }
+            }
+
+            counter = (counter + 1) % 600;
+
+            // --- HIGH FREQUENCY ---
+            if (counter % 2 == 0) UpdateSubpartVisibility();
+
+            // --- MID FREQUENCY (Staggered) ---
+            if (counter % 10 == 1) SyncSettings();           // Frame 1, 11...
+            if (counter % 10 == 2) CheckFunctionalSafety();  // Frame 2, 12... (The "Function Check")
+
+            // NEW: Runs after function check, before UI and Fishing Tick
+            if (counter % 10 == 3) UpdateLocationStatus();   // Frame 3, 13...
+
+            if (counter % 10 == 4) UpdateTerminalUI();       // Frame 4, 14... (The "UI Update")
+
+            // --- LOW FREQUENCY ---
+            if (counter % 600 == 0) RunMainFishingTick();    // The "DoFishingTick"
+        }
+
+        private void UpdateNetMatrixManual()
+        {
+            // Only proceed if the visual exists and the block hasn't been destroyed
+            if (_spawnedNetVisual == null || Block == null || Block.Closed)
+                return;
+
+            // The logic: Take the dummy offset and project it into the block's current world space
+            // Formula: Local * World = TargetWorld
+            MatrixD blockWorldMatrix = Block.WorldMatrix;
+            MatrixD finalWorldMatrix = (MatrixD)_spawnedNetLocalMatrix * blockWorldMatrix;
+
+            // Directly set the WorldMatrix. 
+            // This ignores all hierarchy checks and forces the render object to this coordinate.
+            _spawnedNetVisual.WorldMatrix = finalWorldMatrix;
+        }
+
+        public override void OnRemovedFromScene()
+        {
+            base.OnRemovedFromScene();
+            if (_spawnedNetVisual != null)
+            {
+                _spawnedNetVisual.Close();
+                _spawnedNetVisual = null;
+            }
+        }
+
+        /// <summary>
+        /// Updates visual subparts. Frequency: Every 2 ticks.
+        /// Note: On tick 0, this runs alongside the 10-second fishing tick.
+        /// </summary>
+        public void UpdateSubpartVisibility()
         {
             try
             {
-                SyncSettings();
-                // SyncNetContent(); // Removed as we now sync net content immediately when it changes to minimize desync issues, and we don't want to sync it every 10 frames regardless of changes.
-
-                // If the block is not functional and the net is extended, all fish are lost
-                if (EnableFishing && !_fishCollector.IsFunctional)
-                {
-                    NetContent = 0;
-                    EnableFishing = false;
-                }
-
-                //Below part is only relevant for clients
                 if (MyAPIGateway.Utilities.IsDedicated) return;
 
-                // Ensure visibility stays correct (useful after world loads or grid pastes)
-                RefreshSubpartVisibility();
+                // Keep managing the net based on fishing state
+                //SetSubpartVisibility(SUBPART_NAME_NET, EnableFishing, Block as IMyEntity);
+
+                // We no longer toggle SUBPART_NAME_FISH_DECK ("fish") here.
+                // Instead, we let the child manager handle everything.
+                UpdateFishDeckVisualState(_deckFishVisualState);
+            }
+            catch (Exception e) { LogError($"Error in Visibility Update!\n{e}"); }
+        }
 
 
-                if (MyAPIGateway.Gui.GetCurrentScreen == MyTerminalPageEnum.ControlPanel)
+
+        private IMyEntity AddModelToDummy(IMyEntity parent, string dummyName, string modelPath)
+        {
+            // 1. Find the dummy
+            Dictionary<string, IMyModelDummy> dummies = new Dictionary<string, IMyModelDummy>();
+            parent.Model.GetDummies(dummies);
+
+            IMyModelDummy targetDummy;
+            if (!dummies.TryGetValue(dummyName, out targetDummy))
+                return null;
+
+            // 2. Spawn the entity as a standalone object
+            MyEntity childEntity = new MyEntity();
+            // Use null for the parent to keep it independent of engine parenting logic
+            childEntity.Init(null, modelPath, null, null, null);
+
+            IMyEntity childInterface = childEntity as IMyEntity;
+            childInterface.Render.Visible = true;
+            childInterface.Save = false;
+
+            // We only need the base NeedsDraw flag; we handle the position ourselves
+            childInterface.Flags |= EntityFlags.NeedsDraw;
+            childInterface.PersistentFlags |= MyPersistentEntityFlags2.InScene;
+
+            // 3. Store the Dummy's matrix as our fixed local offset
+            _spawnedNetLocalMatrix = targetDummy.Matrix;
+
+            // 4. Register with the engine
+            MyEntities.Add(childEntity);
+            _spawnedNetVisual = childInterface;
+
+            return childInterface;
+        }
+
+
+        /// <summary>
+        /// Manages the visual representation of fish on the deck. 
+        /// Shuffles and populates fish subparts based on net content, then randomly 
+        /// despawns them one by one over time until the deck is clear.
+        /// </summary>
+        private void UpdateFishDeckVisualState(int visualState)
+        {
+            if (MyAPIGateway.Utilities.IsDedicated) return;
+
+            MyEntitySubpart fishOnDeckSubpart;
+            // If we can't find the parent subpart yet, we can't do anything.
+            if (!_cachedSubparts.TryGetValue(SUBPART_NAME_FISH_DECK, out fishOnDeckSubpart))
+            {
+                // Try to cache it for the next tick
+                Block.TryGetSubpart(SUBPART_NAME_FISH_DECK, out fishOnDeckSubpart);
+                if (fishOnDeckSubpart != null) _cachedSubparts[SUBPART_NAME_FISH_DECK] = fishOnDeckSubpart;
+                else return;
+            }
+
+            IMyEntity subpartEntity = fishOnDeckSubpart as IMyEntity;
+
+            // --- CASE 1: IDLE / STARTUP CLEANUP ---
+            // Because _deckFishVisualState starts at 0 and _currentVisibleFish is empty,
+            // this block runs immediately on load to force-hide any subparts that default to visible.
+            if (visualState <= 0 && _currentVisibleFish.Count == 0)
+            {
+                foreach (var name in SUBPART_NAME_FISH_DECK_FISH)
                 {
-                    Block.RefreshCustomInfo();
-                    Block.SetDetailedInfoDirty();
+                    SetSubpartVisibility(name, false, subpartEntity);
+                }
+                _deckFishVisibleTicks = 0;
+                return;
+            }
+
+            // --- CASE 2: INITIALIZATION (Spawning Fish) ---
+            if (_currentVisibleFish.Count == 0 && visualState > 0)
+            {
+                _deckFishVisibleTicks = 0;
+
+                // Force-hide all before picking new ones (The "Clean Slate" fix)
+                foreach (var name in SUBPART_NAME_FISH_DECK_FISH)
+                {
+                    SetSubpartVisibility(name, false, subpartEntity);
+                }
+
+                var pool = new List<string>(SUBPART_NAME_FISH_DECK_FISH);
+
+                // Fisher-Yates shuffle
+                int n = pool.Count;
+                while (n > 1)
+                {
+                    n--;
+                    int k = _random.Next(n + 1);
+                    string value = pool[k];
+                    pool[k] = pool[n];
+                    pool[n] = value;
+                }
+
+                int fishToShow = MathHelper.Clamp(visualState, 0, pool.Count);
+                for (int i = 0; i < fishToShow; i++)
+                {
+                    SetSubpartVisibility(pool[i], true, subpartEntity);
+                    _currentVisibleFish.Add(pool[i]);
+                }
+                LogDebug($"AQD_LG_TrawlingNet: Visuals Initialized. State: {visualState}, Fish Spawned: {_currentVisibleFish.Count}");
+            }
+
+            // --- CASE 3: DESPAWN ANIMATION ---
+            if (_currentVisibleFish.Count > 0)
+            {
+                _deckFishVisibleTicks++;
+                if (_deckFishVisibleTicks >= 102)
+                {
+                    int randomIndex = _random.Next(0, _currentVisibleFish.Count);
+                    string fishToHide = _currentVisibleFish[randomIndex];
+
+                    SetSubpartVisibility(fishToHide, false, subpartEntity);
+                    _currentVisibleFish.RemoveAt(randomIndex);
+
+                    if (_deckFishVisualState > 0) _deckFishVisualState--;
+                    _deckFishVisibleTicks = 0;
+
+                    LogDebug($"AQD_LG_TrawlingNet: Random Despawn: {fishToHide}. Remaining: {_currentVisibleFish.Count}");
                 }
             }
-            catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in UpdateAfterSimulation10!\n{e}"); }
         }
 
-        public override void UpdateAfterSimulation100()
-        {
-            try
-            {
-                if (count == 0) DoFishingTick();
 
-                count = (count + 1) % 6;
+        /// <summary>
+        /// Validates if the block is still functional. Frequency: Every 10 ticks (Offset 2).
+        /// Runs exactly 1 frame after SyncSettings.
+        /// </summary>
+        public void CheckFunctionalSafety()
+        {
+            if (EnableFishing && !_fishCollector.IsFunctional)
+            {
+                NetContent = 0;
+                EnableFishing = false;
             }
-            catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in UpdateAfterSimulation100!\n{e}"); }
         }
 
-        private void DoFishingTick()
+        /// <summary>
+        /// Checks if the net is currently in a valid fishing zone.
+        /// Frequency: Every 10 ticks.
+        /// </summary>
+        public void UpdateLocationStatus()
         {
             try
             {
+                if (_fishCollector == null) return;
+
+                Vector3D worldPosition = _fishCollector.PositionComp.GetPosition();
+
+                // Check if we are within the general Agaris region (60km radius)
+                if ((worldPosition - MapUtilities.agarisCenter).LengthSquared() > (60000d * 60000d))
+                {
+                    IsInFishLocation = false;
+                    return;
+                }
+
+                // Perform the detailed location check from MapUtilities
+                IsInFishLocation = MapUtilities.IsAtFishLocation(worldPosition);
+            }
+            catch (Exception e)
+            {
+                LogError($"AQD_LG_TrawlingNet: Error in UpdateLocationStatus!\n{e}");
+            }
+        }
+
+        /// <summary>
+        /// Refreshes the Control Panel UI if the player is looking at it. 
+        /// Frequency: Every 10 ticks (Offset 3). Runs exactly 1 frame after Safety Check.
+        /// </summary>
+        public void UpdateTerminalUI()
+        {
+            if (MyAPIGateway.Gui.GetCurrentScreen == MyTerminalPageEnum.ControlPanel)
+            {
+                Block.RefreshCustomInfo();
+                Block.SetDetailedInfoDirty();
+            }
+        }
+
+        /// <summary>
+        /// The heavy lifting fishing logic. Frequency: Every 600 ticks (approx 10 seconds).
+        /// </summary>
+        private void RunMainFishingTick()
+        {
+            try
+            {
+                // 1. Requirement Check
                 if (!_fishCollector.HasInventory || !_fishCollector.IsWorking || !EnableFishing)
                 {
                     LastCaught = 0f;
                     return;
                 }
 
-                Vector3D worldPosition = _fishCollector.PositionComp.GetPosition();
-                if ((worldPosition - MapUtilities.agarisCenter).LengthSquared() > (60000d * 60000d)) return;
-
-                var Agaris = MyGamePruningStructure.GetClosestPlanet(worldPosition);
-                var temp = WaterAPI.GetClosestSurfacePoint(worldPosition, Agaris);
-                double distToSurfaceSq = (temp - worldPosition).LengthSquared();
-
-                // Cache for UI
-                IsInFishLocation = MapUtilities.IsAtFishLocation(worldPosition);
-
-                if (distToSurfaceSq < (50d * 50d) && IsInFishLocation)
+                // 2. Logic uses the value already updated by UpdateLocationStatus()
+                if (IsInFishLocation)
                 {
-                    float? actualVelocity = _fishCollector.CubeGrid?.LinearVelocity.LengthSquared();
-                    if (actualVelocity == null) return;
+                    Vector3D worldPosition = _fishCollector.PositionComp.GetPosition();
+                    var Agaris = MyGamePruningStructure.GetClosestPlanet(worldPosition);
+                    var surfacePoint = WaterAPI.GetClosestSurfacePoint(worldPosition, Agaris);
+                    double distToSurfaceSq = (surfacePoint - worldPosition).LengthSquared();
 
-                    float speedSq = actualVelocity.Value;
-                    LastSpeedSq = speedSq;
-                    var lastEfficiency = GetFishEfficiencySquared(speedSq); // Cached
-                    float amount = _random.Next(CATCH_MIN, CATCH_MAX);
-                    LastCaught = amount * lastEfficiency; // Cached
+                    // Only fish if near the surface
+                    if (distToSurfaceSq < (50d * 50d))
+                    {
+                        float? actualVelocity = _fishCollector.CubeGrid?.LinearVelocity.LengthSquared();
+                        if (actualVelocity == null) return;
 
-                    NetContent += LastCaught;
+                        float speedSq = actualVelocity.Value;
+                        LastSpeedSq = speedSq;
 
-                    // Currently hardcoded for "Fish" in the future this needs to come from the MapUtilities
-                    NetContentSubtypeId = "Fish";
+                        float efficiency = GetFishEfficiencySquared(speedSq);
 
-                    WaterAPI.CreateBubble(worldPosition, 2);
+                        // --- Box-Muller Standard Distribution Implementation ---
+                        // We use two uniform random numbers [0, 1) to generate a normal distribution
+                        double u1 = 1.0 - _random.NextDouble(); // 1.0 - [0,1) to ensure we don't get 0 for the Log
+                        double u2 = 1.0 - _random.NextDouble();
+
+                        // Standard Normal Distribution (Mean = 0, Stdev = 1)
+                        double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
+
+                        // Calculate mean and stdev to fit your CATCH_MIN and CATCH_MAX
+                        // We assume CATCH_MAX is roughly 3 standard deviations from the mean
+                        float mean = (CATCH_MIN + CATCH_MAX) / 2.0f;
+                        float stdDev = (CATCH_MAX - CATCH_MIN) / 6.0f;
+
+                        // Shift and scale the normal distribution, then clamp to your min/max bounds
+                        float amount = (float)(mean + stdDev * randStdNormal);
+                        amount = MathHelper.Clamp(amount, CATCH_MIN, CATCH_MAX);
+                        // -------------------------------------------------------
+
+                        LastCaught = amount * efficiency;
+                        NetContent += LastCaught;
+                        NetContentSubtypeId = "Fish";
+
+                        WaterAPI.CreateBubble(worldPosition, 2);
+                    }
                 }
                 else
                 {
+                    // If not in a fish location, fish escape the net
                     int escaped = _random.Next(ESCAPE_MIN, ESCAPE_MAX);
                     NetContent = Math.Max(0, NetContent - escaped);
                     LastSpeedSq = 0f;
@@ -280,35 +547,55 @@ namespace AaWFoodScript
         }
 
         /// <summary>
-        /// Finds the net subpart and sets its visibility based on EnableFishing.
+        /// Finds a named subpart and sets its visibility. Caches the result to avoid repeated lookups.
+        /// Note: Null entries are NOT cached, so subparts that appear late (e.g. after a grid paste) will still be found.
         /// </summary>
-        private void RefreshSubpartVisibility()
+        private void SetSubpartVisibility(string subpartName, bool visible, IMyEntity myEntity )
         {
             try
             {
-                if (MyAPIGateway.Session.IsServer && MyAPIGateway.Utilities.IsDedicated)
+                if (MyAPIGateway.Utilities.IsDedicated)
                     return;
 
+                // Debug log to track subpart visibility changes and lookups
+                LogDebug($"AQD_LG_TrawlingNet: SetSubpartVisibility called for subpart '{subpartName}' with visible={visible}; entId={Entity?.EntityId}");
+
                 // Try to find the subpart once if we haven't already
-                if (_cachedNetSubpart == null)
+                MyEntitySubpart subpart;
+                bool inCache = _cachedSubparts.TryGetValue(subpartName, out subpart);
+
+                if (!inCache || subpart == null || subpart.Closed)
                 {
-                    Entity.TryGetSubpart(SUBPART_NAME, out _cachedNetSubpart);
+                    myEntity.TryGetSubpart(subpartName, out subpart);
+
+                    if (subpart != null)
+                    {
+                        // Only cache on success so we keep retrying if the subpart isn't ready yet
+                        _cachedSubparts[subpartName] = subpart;
+                        LogDebug($"AQD_LG_TrawlingNet: SetSubpartVisibility: cached subpart '{subpartName}'; entId={Entity?.EntityId}");
+                    }
+                    else
+                    {
+                        LogDebug($"AQD_LG_TrawlingNet: SetSubpartVisibility: subpart '{subpartName}' not found, will retry next tick; entId={Entity?.EntityId}");
+                        return;
+                    }
                 }
 
+                //Entity.TryGetSubpart(subpartName, out subpart);
+
                 // If we found it (now or previously), update visibility
-                if (_cachedNetSubpart != null)
+                if (subpart != null && subpart.Render.Visible != visible)
                 {
-                    if (_cachedNetSubpart.Render.Visible != EnableFishing)
-                    {
-                        _cachedNetSubpart.Render.Visible = EnableFishing;
-                    }
+                    subpart.Render.Visible = visible;
+                    LogDebug($"AQD_LG_TrawlingNet: SetSubpartVisibility: '{subpartName}' visibility set to {visible}; entId={Entity?.EntityId}");
                 }
             }
             catch (Exception e)
             {
-                LogError($"AQD_LG_TrawlingNet: Error in RefreshSubpartVisibility!\n{e}");
+                LogError($"AQD_LG_TrawlingNet: Error in SetSubpartVisibility (subpart={subpartName})!\n{e}");
             }
         }
+
 
         public float GetFishEfficiencySquared(float speedSq)
         {
@@ -333,6 +620,16 @@ namespace AaWFoodScript
                     LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory: NetContent below threshold, skipping; entId={Entity?.EntityId}");
                     return;
                 }
+
+                // Calculate content percentage based on what was in the net BEFORE resetting it
+                float contentPercentage = (NetContent / MAX_NET_CONTENT) * 100f;
+
+                // 0% = 0, 1-20% = 1, 21-40% = 2, 41-60% = 3, 61-80% = 4, 81-100% = 5
+                int newState = (int)Math.Ceiling(contentPercentage / 20f);
+                _deckFishVisualState = MathHelper.Clamp(newState, 0, SUBPART_NAME_FISH_DECK_FISH.Length);
+
+                // Log it so you can see the math in the debugger
+                LogDebug($"AQD_LG_TrawlingNet: Visual State calculated: {_deckFishVisualState} ({contentPercentage:F1}%)");
 
                 IMyInventory inventory = _fishCollector.GetInventory();
                 if (inventory == null)
@@ -483,34 +780,78 @@ namespace AaWFoodScript
             catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in UpdateSettingsFromInput!\n{e}"); }
         }
 
+        /// <summary>
+        /// Synchronizes net content across the network. 
+        /// Creates a new content object for the packet to prevent modifying the block's persistent state.
+        /// </summary>
+        void SyncNetContent(bool emptyNet = false)
+        {
+            try
+            {
+                LogDebug($"AQD_LG_TrawlingNet: SyncNetContent sending; emptyNet={emptyNet}; NetContent={NetContent}; subtype={NetContentSubtypeId}");
+
+                // BUG FIX: Instantiate a NEW object for the packet. 
+                // Using the persistent 'Content' reference was causing the 'EmptyNet' flag to get stuck on True locally.
+                var packetContent = new TrawlingNetContent
+                {
+                    NetContent = this.NetContent,
+                    NetContentSubtypeId = this.NetContentSubtypeId,
+                    IsInFishLocation = this.IsInFishLocation,
+                    LastSpeedSq = this.LastSpeedSq,
+                    LastCaught = this.LastCaught,
+                    EmptyNet = emptyNet
+                };
+
+                SaveNetContent();
+                Session.SendTrawlingNetContentPacketSetting(Block.EntityId, packetContent);
+            }
+            catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in SyncNetContent!\n{e}"); }
+        }
+
         public void UpdateNetContentFromInput(TrawlingNetContent loadedNetContent)
         {
             try
             {
-                LogDebug($"AQD_LG_TrawlingNet: UpdateNetContentFromInput called; incomingNetContent={loadedNetContent?.NetContent}; incomingEmptyNet={loadedNetContent?.EmptyNet}; incomingSubtype={loadedNetContent?.NetContentSubtypeId}; entId={Entity?.EntityId}");
+                if (loadedNetContent == null) return;
 
-                if (Content == loadedNetContent)
+                // BUG FIX: Only sync SubtypeId if the incoming one is valid.
+                // This prevents 'Fish' being overwritten by an empty string during network jitter.
+                if (!string.IsNullOrWhiteSpace(loadedNetContent.NetContentSubtypeId))
                 {
-                    LogDebug($"AQD_LG_TrawlingNet: UpdateNetContentFromInput: content unchanged, skipping; entId={Entity?.EntityId}");
-                    return; // No change, no need to update
+                    Content.NetContentSubtypeId = loadedNetContent.NetContentSubtypeId;
                 }
 
-                // Sync all but the empty net state
                 Content.NetContent = MathHelper.Clamp(loadedNetContent.NetContent, 0, MAX_NET_CONTENT);
-                Content.NetContentSubtypeId = loadedNetContent.NetContentSubtypeId;
                 Content.IsInFishLocation = loadedNetContent.IsInFishLocation;
                 Content.LastSpeedSq = loadedNetContent.LastSpeedSq;
                 Content.LastCaught = loadedNetContent.LastCaught;
 
-                LogDebug($"AQD_LG_TrawlingNet: UpdateNetContentFromInput: content synced; NetContent={Content.NetContent}; SubtypeId={Content.NetContentSubtypeId}; IsInFishLocation={Content.IsInFishLocation}; LastSpeedSq={Content.LastSpeedSq}; LastCaught={Content.LastCaught}; entId={Entity?.EntityId}");
-
-                if (loadedNetContent.EmptyNet) // Handle the net emptying case with the inventory transfer
+                if (loadedNetContent.EmptyNet)
                 {
-                    LogDebug($"AQD_LG_TrawlingNet: UpdateNetContentFromInput: EmptyNet=true, calling TransferNetContentToInventory; entId={Entity?.EntityId}");
+                    LogDebug($"AQD_LG_TrawlingNet: Received EmptyNet flag, triggering transfer; entId={Entity?.EntityId}");
                     TransferNetContentToInventory();
                 }
             }
             catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in UpdateNetContentFromInput!\n{e}"); }
+        }
+
+        void LoadNetContent()
+        {
+            if (Block.Storage == null) return;
+            string rawData;
+            if (!Block.Storage.TryGetValue(StorageKeys.FISHATWARNETCONTENT, out rawData)) return;
+            try
+            {
+                var loadedNetContent = MyAPIGateway.Utilities.SerializeFromBinary<TrawlingNetContent>(Convert.FromBase64String(rawData));
+                if (loadedNetContent != null)
+                {
+                    // BUG FIX: Load the entire content object instead of just the float value
+                    Content.NetContent = loadedNetContent.NetContent;
+                    Content.NetContentSubtypeId = loadedNetContent.NetContentSubtypeId;
+                    Content.LastCaught = loadedNetContent.LastCaught;
+                }
+            }
+            catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error loading net content!\n{e}"); }
         }
 
         void LoadSettings()
@@ -526,18 +867,6 @@ namespace AaWFoodScript
             catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error loading settings!\n{e}"); }
         }
 
-        void LoadNetContent()
-        {
-            if (Block.Storage == null) return;
-            string rawData;
-            if (!Block.Storage.TryGetValue(StorageKeys.FISHATWARNETCONTENT, out rawData)) return;
-            try
-            {
-                var loadedNetContent = MyAPIGateway.Utilities.SerializeFromBinary<TrawlingNetContent>(Convert.FromBase64String(rawData));
-                if (loadedNetContent != null) NetContent = loadedNetContent.NetContent;
-            }
-            catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error loading net content!\n{e}"); }
-        }
 
         void SaveNetContent()
         {
@@ -573,25 +902,6 @@ namespace AaWFoodScript
                 }
             }
             catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in SyncSettings!\n{e}"); }
-        }
-
-        void SyncNetContent(bool emptyNet = false)
-        {
-            try
-            {
-                LogDebug($"AQD_LG_TrawlingNet: SyncNetContent called; emptyNet={emptyNet}; NetContent={NetContent}; entId={Entity?.EntityId}");
-                var currentContent = Content;
-                
-                currentContent.EmptyNet = emptyNet;
-                LogDebug($"AQD_LG_TrawlingNet: SyncNetContent EmptyNet flag set on content; entId={Entity?.EntityId}");
-
-                // Sync net content immediately when it changes, to ensure server always has the most up-to-date content for inventory transfer and to minimize desync issues with clients.
-                SaveNetContent();
-                LogDebug($"AQD_LG_TrawlingNet: SyncNetContent SaveNetContent complete, sending packet; entId={Entity?.EntityId}");
-                Session.SendTrawlingNetContentPacketSetting(Block.EntityId, currentContent);
-                LogDebug($"AQD_LG_TrawlingNet: SyncNetContent packet sent; entId={Entity?.EntityId}");
-            }
-            catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in SyncNetContent!\n{e}"); }
         }
 
         public override bool IsSerialized()

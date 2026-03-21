@@ -1,12 +1,12 @@
 ﻿using ProtoBuf;
 using Digi.NetworkLib;
-using AaWFoodScript;
+using PEPCO;
 
 
 namespace Digi.NetworkLib
 {
-    [ProtoInclude(10, typeof(TrawlingNetSettingsPacket))]
-    [ProtoInclude(11, typeof(TrawlingNetContentPacket))]
+    [ProtoInclude(10, typeof(TrawlingNet_SettingsPacket))]
+    [ProtoInclude(11, typeof(TrawlingNet_ContentPacket))]
 
     public abstract partial class PacketBase
     {

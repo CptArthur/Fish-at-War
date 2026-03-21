@@ -1,4 +1,4 @@
-﻿using AaWFoodScript;
+﻿using PEPCO;
 using Digi;
 using Sandbox.Common.ObjectBuilders.Definitions;
 using Sandbox.Game;
@@ -25,7 +25,7 @@ using static PEPCO.ScriptHelpers;
 namespace PEPCO
 {
     [MyTextSurfaceScript("TrawlingNetExtTSS", "Trawling Net Monitor")]
-    public class TrawlingNetExtTSS : MyTSSCommon
+    public class TrawlingNet_ExtTSS : MyTSSCommon
     {
         #region Fields & Constants
 
@@ -45,7 +45,7 @@ namespace PEPCO
 
         #region Lifecycle
 
-        public TrawlingNetExtTSS(IMyTextSurface surface, IMyCubeBlock block, Vector2 size) : base(surface, block, size)
+        public TrawlingNet_ExtTSS(IMyTextSurface surface, IMyCubeBlock block, Vector2 size) : base(surface, block, size)
         {
             TerminalBlock = (IMyTerminalBlock)block;
             TerminalBlock.OnMarkForClose += BlockMarkedForClose;
