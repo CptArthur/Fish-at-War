@@ -12,7 +12,7 @@ using static PEPCO.ScriptHelpers;
 using BlendTypeEnum = VRageRender.MyBillboard.BlendTypeEnum;
 using VRage.ModAPI; // required for MyTransparentGeometry/MySimpleObjectDraw to be able to set blend type.
 
-namespace AaWFoodScript
+namespace PEPCO
 {
     // This object is always present, from the world load to world unload.
     // NOTE: all clients and server run mod scripts, keep that in mind.
@@ -30,8 +30,8 @@ namespace AaWFoodScript
         // Network and network packets
         public const ushort NETWORK_ID = (ushort)(3680484848 % ushort.MaxValue); // Using the prod workshopId of the mod, which is 3680484848
         public Network Net;
-        private TrawlingNetSettingsPacket _settingsPacket;
-        private TrawlingNetContentPacket _contentPacket;
+        private TrawlingNet_SettingsPacket _settingsPacket;
+        private TrawlingNet_ContentPacket _contentPacket;
 
 
         public override void LoadData()
@@ -62,11 +62,11 @@ namespace AaWFoodScript
 
             Net.SerializeTest = true;
 
-            _settingsPacket = new TrawlingNetSettingsPacket();
-            _contentPacket = new TrawlingNetContentPacket();
+            _settingsPacket = new TrawlingNet_SettingsPacket();
+            _contentPacket = new TrawlingNet_ContentPacket();
 
-            TrawlingNetSettingsPacket.OnReceive += TrawlingNetSettingsPacketReceived;
-            TrawlingNetContentPacket.OnReceive += TrawlingNetContentPacketReceived;
+            TrawlingNet_SettingsPacket.OnReceive += TrawlingNetSettingsPacketReceived;
+            TrawlingNet_ContentPacket.OnReceive += TrawlingNetContentPacketReceived;
         }
 
         // Used by the logic components to sync settings to the server
@@ -83,7 +83,7 @@ namespace AaWFoodScript
         }
 
 
-        void TrawlingNetSettingsPacketReceived(TrawlingNetSettingsPacket packet, ref PacketInfo packetInfo, ulong senderSteamId)
+        void TrawlingNetSettingsPacketReceived(TrawlingNet_SettingsPacket packet, ref PacketInfo packetInfo, ulong senderSteamId)
         {
             IMyEntity ent = MyEntities.GetEntityById(packet.EntityId);
             if (ent == null)
@@ -107,7 +107,7 @@ namespace AaWFoodScript
 
         }
 
-        void TrawlingNetContentPacketReceived(TrawlingNetContentPacket packet, ref PacketInfo packetInfo, ulong senderSteamId)
+        void TrawlingNetContentPacketReceived(TrawlingNet_ContentPacket packet, ref PacketInfo packetInfo, ulong senderSteamId)
         {
             LogDebug($"AQD_LG_TrawlingNet Session: TrawlingNetContentPacketReceived; EntityId={packet.EntityId}; NetContent={packet.PacketContent?.NetContent}; EmptyNet={packet.PacketContent?.EmptyNet}; SubtypeId={packet.PacketContent?.NetContentSubtypeId}; sender={senderSteamId}");
 

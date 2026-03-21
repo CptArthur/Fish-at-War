@@ -1,4 +1,4 @@
-﻿using AaWFoodScript;
+﻿using PEPCO;
 using BigGustave;
 using OreDetectorReforged;
 using Sandbox.Definitions;
@@ -15,7 +15,7 @@ using VRage;
 using VRage.Utils;
 using VRageMath;
 
-namespace AaWFoodScript
+namespace PEPCO
 {
     static class MapUtilities
     {

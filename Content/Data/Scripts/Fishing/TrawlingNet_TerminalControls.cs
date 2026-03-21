@@ -17,9 +17,9 @@ using VRageMath;
 using VRageRender.Messages;
 using static VRage.Game.MyObjectBuilder_BehaviorTreeDecoratorNode;
 
-namespace AaWFoodScript
+namespace PEPCO
 {
-    public class TrawlingNetTerminalControls
+    public class TrawlingNet_TerminalControls
     {
 
         const string IdPrefix = "FishAtWar"; // highly recommended to tag your properties/actions like this to avoid colliding with other mods'
