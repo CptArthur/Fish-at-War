@@ -190,20 +190,7 @@ namespace PEPCO
 
                 Block.AppendingCustomInfo += AppendCustomInfo;
 
-                // Calculate the correct folder path for the model "\Models\Cubes\large\AQD_LG_TrawlingNet_Subpart_Net.mwm"
-                string pathToModel = "";
-                if (GetFullModPathSafe("Models\\Cubes\\large\\AQD_LG_TrawlingNet_Subpart_Net.mwm", ModContext, out pathToModel))
-                {
-                    LogDebug($"AQD_LG_TrawlingNet: Model path resolved successfully: {pathToModel}");
-                }
-                else
-                {
-                    LogError($"AQD_LG_TrawlingNet: Failed to resolve model path for net subpart! Path attempted: Models\\Cubes\\large\\AQD_LG_TrawlingNet_Subpart_Net.mwm");
-                }
 
-                // Set the net subpart to the correct dummy
-                _spawnedNetVisual = AddModelToDummy(Block as IMyEntity, SUBPART_NAME_NET, pathToModel);
-                _spawnedNetVisual.Visible = true;
 
 
                 //NeedsUpdate |= MyEntityUpdateEnum.EACH_10TH_FRAME;
@@ -222,50 +209,74 @@ namespace PEPCO
         /// </summary>
         public override void UpdateAfterSimulation()
         {
-            if (!IsDedicatedServer())
+            try
             {
-                // Update the net visual every tick
-                UpdateNetMatrixManual();
-
-                // update net entity visual
-                if (EnableFishing != _spawnedNetVisual.Render.Visible)
+                if (!IsDedicatedServer())
                 {
-                    _spawnedNetVisual.Render.Visible = EnableFishing;
+                    // Update the net visual every tick
+                    UpdateNetMatrixManual();
                 }
+
+                counter = (counter + 1) % 600;
+
+                // --- HIGH FREQUENCY ---
+                if (counter % 2 == 0) UpdateSubpartVisibility();
+
+                // --- MID FREQUENCY (Staggered) ---
+                if (counter % 10 == 1) SyncSettings();           // Frame 1, 11...
+                if (counter % 10 == 2) CheckFunctionalSafety();  // Frame 2, 12... (The "Function Check")
+
+                // NEW: Runs after function check, before UI and Fishing Tick
+                if (counter % 10 == 3) UpdateLocationStatus();   // Frame 3, 13...
+
+                if (counter % 10 == 4) UpdateTerminalUI();       // Frame 4, 14... (The "UI Update")
+
+                // --- LOW FREQUENCY ---
+                if (counter % 600 == 0) RunMainFishingTick();    // The "DoFishingTick"
             }
-
-            counter = (counter + 1) % 600;
-
-            // --- HIGH FREQUENCY ---
-            if (counter % 2 == 0) UpdateSubpartVisibility();
-
-            // --- MID FREQUENCY (Staggered) ---
-            if (counter % 10 == 1) SyncSettings();           // Frame 1, 11...
-            if (counter % 10 == 2) CheckFunctionalSafety();  // Frame 2, 12... (The "Function Check")
-
-            // NEW: Runs after function check, before UI and Fishing Tick
-            if (counter % 10 == 3) UpdateLocationStatus();   // Frame 3, 13...
-
-            if (counter % 10 == 4) UpdateTerminalUI();       // Frame 4, 14... (The "UI Update")
-
-            // --- LOW FREQUENCY ---
-            if (counter % 600 == 0) RunMainFishingTick();    // The "DoFishingTick"
+            catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in UpdateAfterSimulation!\n{e}"); }
+            
         }
 
         private void UpdateNetMatrixManual()
         {
-            // Only proceed if the visual exists and the block hasn't been destroyed
-            if (_spawnedNetVisual == null || Block == null || Block.Closed)
+            // 1. Handle Cleanup & Early Exit
+            if (Block == null || Block.Closed || !Block.IsFunctional)
+            {
+                if (_spawnedNetVisual != null)
+                {
+                    _spawnedNetVisual.Close();
+                    _spawnedNetVisual = null;
+                }
                 return;
+            }
 
-            // The logic: Take the dummy offset and project it into the block's current world space
-            // Formula: Local * World = TargetWorld
-            MatrixD blockWorldMatrix = Block.WorldMatrix;
-            MatrixD finalWorldMatrix = (MatrixD)_spawnedNetLocalMatrix * blockWorldMatrix;
+            // 2. Ensure Visual Exists (Initialization)
+            if (_spawnedNetVisual == null)
+            {
+                string pathToModel;
+                const string MODEL_PATH = "Models\\Cubes\\large\\AQD_LG_TrawlingNet_Subpart_Net.mwm";
 
-            // Directly set the WorldMatrix. 
-            // This ignores all hierarchy checks and forces the render object to this coordinate.
-            _spawnedNetVisual.WorldMatrix = finalWorldMatrix;
+                if (GetFullModPathSafe(MODEL_PATH, ModContext, out pathToModel))
+                {
+                    LogDebug($"AQD_LG_TrawlingNet: Model path resolved: {pathToModel}");
+                    _spawnedNetVisual = AddModelToDummy(Block as IMyEntity, SUBPART_NAME_NET, pathToModel);
+                }
+                else
+                {
+                    LogError($"AQD_LG_TrawlingNet: Failed to resolve path: {MODEL_PATH}");
+                    return; // Exit if we failed to create it
+                }
+            }
+
+            // update net entity visual
+            if (EnableFishing != _spawnedNetVisual.Render.Visible)
+            {
+                _spawnedNetVisual.Render.Visible = EnableFishing;
+            }
+
+            // Use Multiply for clarity; MatrixD * MatrixD is fine in VRage
+            _spawnedNetVisual.WorldMatrix = _spawnedNetLocalMatrix * Block.WorldMatrix;
         }
 
         public override void OnRemovedFromScene()
