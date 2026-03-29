@@ -22,7 +22,7 @@ namespace PEPCO
     public class TrawlingNet_TerminalControls
     {
 
-        const string IdPrefix = "FishAtWar"; // highly recommended to tag your properties/actions like this to avoid colliding with other mods'
+        const string IdPrefix = "FishAtWar_"; // highly recommended to tag your properties/actions like this to avoid colliding with other mods'
 
         static bool Done = false;
         private AaWFood_Session Session => AaWFood_Session.Instance; // helper to access the session component instance, which is where shared state and the network handler live
@@ -35,6 +35,7 @@ namespace PEPCO
 
             CreateControls();
             CreateActions(context);
+            CreateProperties();
         }
 
         static bool CustomVisibleCondition(IMyTerminalBlock b)
@@ -136,6 +137,31 @@ namespace PEPCO
 
 
 
+        }
+
+        static void CreateProperties()
+        {
+            {
+                var p = MyAPIGateway.TerminalControls.CreateProperty<float, IMyFunctionalBlock>(IdPrefix + "NetContent");
+                // SupportsMultipleBlocks, Enabled and Visible don't have a use for this, and Title/Tooltip don't exist.
+
+                p.Getter = (b) => {
+                    var logic = b?.GameLogic?.GetAs<FishCollectorComponent>();
+                    if (logic == null) return -1f;
+                    
+                    return logic.NetContent;
+                };
+
+                p.Setter = (b, v) =>
+                {
+                };
+
+                MyAPIGateway.TerminalControls.AddControl<IMyFunctionalBlock>(p);
+
+
+                //a mod or PB can use it like:
+                //float netConent = block.GetValue<float>("FishAtWar_NetContent");
+            }
         }
     }
 }
