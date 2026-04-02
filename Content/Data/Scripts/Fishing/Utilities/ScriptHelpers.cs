@@ -7,6 +7,7 @@ using VRage.Game.ModAPI;
 using VRageMath;
 using PEPCO.Utilities;
 using VRage.ModAPI;
+using VRage.Game.Entity;
 
 namespace PEPCO
 {
@@ -1119,6 +1120,10 @@ namespace PEPCO
 
             return targetDummy;
         }
+
+        #endregion
+
+        #region Definitions and stuff
 
         #endregion
     }
