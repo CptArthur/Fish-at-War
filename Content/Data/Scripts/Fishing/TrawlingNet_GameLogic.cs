@@ -45,9 +45,9 @@ namespace PEPCO
 
         private Random _random;
 
-        private const double SpeedLowSq = 10 * 10;
-        private const double SpeedMidSq = 15 * 15;
-        private const double SpeedHighSq = 25 * 25;
+        private const double SpeedLowSq = 5 * 5;
+        private const double SpeedMidSq = 10 * 10;
+        private const double SpeedHighSq = 15 * 15;
 
         public readonly TrawlingNetSettings Settings = new TrawlingNetSettings();
         public readonly TrawlingNetContent Content = new TrawlingNetContent();
