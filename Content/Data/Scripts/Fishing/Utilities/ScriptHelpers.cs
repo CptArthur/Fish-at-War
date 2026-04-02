@@ -6,6 +6,8 @@ using VRage.Game;
 using VRage.Game.ModAPI;
 using VRageMath;
 using PEPCO.Utilities;
+using VRage.ModAPI;
+using VRage.Game.Entity;
 
 namespace PEPCO
 {
@@ -1081,7 +1083,7 @@ namespace PEPCO
 
         #region path handling
 
-        public static bool GetFullModPathSafe(string relativePath, IMyModContext modContext, out string fullPath)
+        public static bool TryGetFullModelPath(string relativePath, IMyModContext modContext, out string fullPath)
         {
             fullPath = string.Empty;
             if (string.IsNullOrEmpty(relativePath)) return false;
@@ -1102,6 +1104,26 @@ namespace PEPCO
 
 
         }
+
+        #endregion
+
+        #region Subpart Handling
+
+        public static IMyModelDummy SafeGetDummy(string name, IMyEntity parent)
+        {
+            Dictionary<string, IMyModelDummy> dummies = new Dictionary<string, IMyModelDummy>();
+            parent?.Model?.GetDummies(dummies);
+
+            IMyModelDummy targetDummy;
+            if (!dummies.TryGetValue(name, out targetDummy))
+                return null;
+
+            return targetDummy;
+        }
+
+        #endregion
+
+        #region Definitions and stuff
 
         #endregion
     }
