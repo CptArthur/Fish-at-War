@@ -815,10 +815,24 @@ namespace PEPCO
                     // Only fish if near the surface
                     if (distToSurfaceSq < (50d * 50d))
                     {
-                        float? actualVelocity = _fishCollector.CubeGrid?.LinearVelocity.LengthSquared();
-                        if (actualVelocity == null) return;
+                        Vector3? actualVelocity = _fishCollector.CubeGrid?.LinearVelocity;
+                        if (!actualVelocity.HasValue) return;
 
-                        float speedSq = actualVelocity.Value;
+                        // Project linear velocity onto the forward vector of the block to get the effective speed of the net through the water
+                        float effectiveSpeed = Vector3.Dot((Vector3)Block.WorldMatrix.Backward, actualVelocity.Value);
+
+                        // --- DEBUG LOGGING ---
+                        // Logs both the ship's overall raw speed and how much of it is actually pulling the net forward
+                        LogDebug($"AQD_LG_TrawlingNet: Raw Ship Speed: {actualVelocity.Value.Length():F2} m/s | Effective Net Speed: {effectiveSpeed:F2} m/s");
+
+                        // Prevent reverse trawling (if speed is negative, they are moving backward)
+                        if (effectiveSpeed < 0f)
+                        {
+                            effectiveSpeed = 0f;
+                        }
+
+                        // Square it for your efficiency calculations and UI updates later
+                        float speedSq = effectiveSpeed * effectiveSpeed;
                         LastSpeedSq = speedSq;
 
                         float efficiency = GetFishEfficiencySquared(speedSq);
