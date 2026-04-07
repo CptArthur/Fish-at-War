@@ -61,7 +61,7 @@ namespace PEPCO // Change this to your actual namespace
             {
                 if (task.ClientOnly && _isDedicated) continue;
 
-                if ((_counter + task.Offset) % task.Interval == 0)
+                if (_counter % task.Interval == task.Offset)
                 {
                     try
                     {
