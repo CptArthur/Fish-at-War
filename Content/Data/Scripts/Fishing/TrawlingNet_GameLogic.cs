@@ -232,10 +232,10 @@ namespace PEPCO
                     _scheduler.Register(SyncSettings, 10);
                     _scheduler.Register(CheckFunctionalSafety, 10);
                     _scheduler.Register(CheckBlockOrientation, 10);
+                    _scheduler.Register(CheckNetSubmersion, 10);
                     _scheduler.Register(UpdateLocationStatus, 10);
                     _scheduler.Register(UpdateTerminalUI, 10);
                     _scheduler.Register(DoWaterSFX, 10, true); // Client only
-                    //_scheduler.Register(UpdateNetOffset, 10, true); // Client only
 
                     //_scheduler.Register(UpdateSubpartVisibility, 2, true); // Client only -> Taken out for now since no fish dummys in the model, but will be needed when we add them back in.
                     _scheduler.Register(RunMainFishingTick, 600);
@@ -501,69 +501,7 @@ namespace PEPCO
             return child;
         }
 
-        private void UpdateNetOffset()
-        {
-            // 1. Validation
-            MyEntitySubpart netSubpart;
-            if (!_cachedSubparts.TryGetValue(SUBPART_NAME_NET, out netSubpart) || netSubpart == null || netSubpart.Closed)
-                return;
 
-            var model = netSubpart.Model as IMyModel;
-            Dictionary<string, IMyModelDummy> dummies = new Dictionary<string, IMyModelDummy>();
-            model.GetDummies(dummies);
-
-            IMyModelDummy dLeft, dCenter, dRight;
-            if (!dummies.TryGetValue("net_bounds_left", out dLeft) ||
-                !dummies.TryGetValue("net_bounds_center", out dCenter) ||
-                !dummies.TryGetValue("net_bounds_right", out dRight)) return;
-
-            // 2. Calculate the "Geometric Center" of the dummies in Local Space
-            Vector3D localDummyCenter = ((Vector3D)dLeft.Matrix.Translation +
-                                         (Vector3D)dCenter.Matrix.Translation +
-                                         (Vector3D)dRight.Matrix.Translation) / 3.0;
-
-            // 3. STABLE World Position
-            // We transform the dummy center by the SHIP'S WorldMatrix (Entity).
-            // This gives us the world position of the dummies IF the net were at its default (unmodified) position.
-            Vector3D worldDummyPosNeutral = Vector3D.Transform(localDummyCenter, Entity.WorldMatrix);
-
-            // 4. Get the Water Surface at that stable world position
-            Vector3D surfacePoint = WaterAPI.GetClosestSurfacePoint(worldDummyPosNeutral);
-
-            // Safety check for NaN or invalid API returns
-            if (!surfacePoint.IsValid() || surfacePoint == Vector3D.Zero) return;
-
-            // 5. Calculate the Total Gap in World Space
-            // This is the distance from the ship's "neutral" dummy position to the actual water.
-            double worldVerticalGap = surfacePoint.Y - worldDummyPosNeutral.Y;
-
-            // 6. Convert World Gap to Local Correction
-            // We use Entity's worldUp to account for ship tilt.
-            Vector3D worldUp = Entity.WorldMatrix.Up;
-            double targetLocalYOffset = worldVerticalGap / worldUp.Y;
-
-            // 7. Apply Smoothed Absolute Translation
-            Matrix localMatrix = netSubpart.PositionComp.LocalMatrixRef;
-            float originalModelDummyY = 12.5f;
-            float targetLocalY = (float)(targetLocalYOffset - originalModelDummyY);
-
-            // Smooth the transition: 10% of the way to the target per frame
-            // Change 0.1f to a smaller number (e.g. 0.05f) for a "heavier" feeling net
-            float currentY = localMatrix.Translation.Y;
-            float smoothedY = currentY + (targetLocalY - currentY) * 0.4f;
-
-            // 8. Clamping 
-            if (smoothedY > 50f) smoothedY = 50f;
-            if (smoothedY < -50f) smoothedY = -50f;
-
-            localMatrix.Translation = new Vector3(localMatrix.Translation.X, smoothedY, localMatrix.Translation.Z);
-
-            // 9. Final Safety & Apply
-            if (!localMatrix.IsValid()) return;
-            netSubpart.PositionComp.SetLocalMatrix(ref localMatrix);
-
-            LogDebug($"Net Corrected -> Target: {targetLocalYOffset:F2} | SubpartY: {smoothedY:F2}");
-        }
         #endregion
 
         #region Render Visibility Helpers
@@ -708,33 +646,16 @@ namespace PEPCO
             }
         }
 
-        public void UpdateLocationStatus()
-        {
-            try
-            {
-                if (_fishCollector == null) return;
-
-                Vector3D worldPosition = _fishCollector.PositionComp.GetPosition();
-
-                if ((worldPosition - MapUtilities.agarisCenter).LengthSquared() > (60000d * 60000d)) // If we're very far from the planet, skip the expensive pixel check and just say we're not in a fish location
-                {
-                    IsInFishLocation = false;
-                }
-                else
-                {
-                    IsInFishLocation = MapUtilities.IsAtFishLocation(worldPosition);
-                }
-
-            }
-            catch (Exception e)
-            {
-                LogError($"AQD_LG_TrawlingNet: Error in UpdateLocationStatus!\n{e}");
-            }
-        }
-
         public void CheckBlockOrientation()
         {
-            if (_fishCollector?.CubeGrid?.Physics == null) return; // Defensive check to avoid null refs, also ensures we have the necessary data to do orientation checks
+            if (!_evaluator.IsFunctional ||
+                !_evaluator.IsWorking ||
+                !_evaluator.IsEnabled ||
+                _fishCollector?.CubeGrid?.Physics == null)
+            {
+                _evaluator.IsOriented = false;
+                return;
+            }
 
             // Get the up vector of the block in world space and the gravity vector from the physics component
             Vector3D blockUp = Vector3D.TransformNormal(Vector3D.Up, _fishCollector.WorldMatrix);
@@ -758,6 +679,78 @@ namespace PEPCO
             }
 
         }
+        private void CheckNetSubmersion()
+        {
+            if (!_evaluator.IsFunctional || !_evaluator.IsWorking || !_evaluator.IsEnabled || !_evaluator.IsOriented)
+            {
+                _evaluator.IsSubmerged = false;
+                return;
+            }
+
+            // 1. Validation
+            MyEntitySubpart netSubpart;
+            if (!_cachedSubparts.TryGetValue(SUBPART_NAME_NET, out netSubpart) || netSubpart == null || netSubpart.Closed)
+            {
+                LogDebug($"CheckNetSubmersion: Net subpart not found or invalid, cannot check submersion; entId={Entity?.EntityId}");
+                _evaluator.IsSubmerged = false; // Assume not submerged if we can't find the subpart to check, to avoid false positives
+                return;
+            }
+
+            var model = netSubpart.Model as IMyModel;
+            Dictionary<string, IMyModelDummy> dummies = new Dictionary<string, IMyModelDummy>();
+            model.GetDummies(dummies);
+
+            IMyModelDummy dLeft, dCenter, dRight;
+            if (!dummies.TryGetValue("net_bounds_left", out dLeft) ||
+                !dummies.TryGetValue("net_bounds_center", out dCenter) ||
+                !dummies.TryGetValue("net_bounds_right", out dRight))
+            {
+                LogDebug($"CheckNetSubmersion: One or more dummies not found in model; entId={Entity?.EntityId}");
+                _evaluator.IsSubmerged = false; // Assume not submerged if we can't find the dummies to check, to avoid false positives
+                return;
+            }
+
+            // Calculate the "Geometric Center" of the dummies in Local Space
+            Vector3D localDummyCenter = ((Vector3D)dLeft.Matrix.Translation +
+                                         (Vector3D)dCenter.Matrix.Translation +
+                                         (Vector3D)dRight.Matrix.Translation) / 3.0;
+
+            // We transform the dummy center by the subparts worldmatrix
+            Vector3D worldDummyPos = LocalPositionToGlobal(localDummyCenter, netSubpart.PositionComp.WorldMatrixRef);
+
+            // 4. Get the Water Surface at that stable world position
+            _evaluator.IsSubmerged = WaterAPI.IsUnderwater(worldDummyPos);
+
+            LogDebug($"CheckNetSubmersion: IsSubmerged={_evaluator.IsSubmerged}");
+        }
+        public void UpdateLocationStatus()
+        {
+            try
+            {
+                if (!_evaluator.IsFunctional ||
+                    !_evaluator.IsWorking)
+                {
+                    IsInFishLocation = false;
+                    return;
+                }
+
+                Vector3D worldPosition = _fishCollector.PositionComp.GetPosition();
+
+                if ((worldPosition - MapUtilities.agarisCenter).LengthSquared() > (60000d * 60000d)) // If we're very far from the planet, skip the expensive pixel check and just say we're not in a fish location
+                {
+                    IsInFishLocation = false;
+                }
+                else
+                {
+                    IsInFishLocation = MapUtilities.IsAtFishLocation(worldPosition);
+                }
+
+            }
+            catch (Exception e)
+            {
+                LogError($"AQD_LG_TrawlingNet: Error in UpdateLocationStatus!\n{e}");
+            }
+        }
 
         public class NetStatusEvaluator
         {
@@ -766,15 +759,18 @@ namespace PEPCO
             public bool IsWorking { internal set; get; }
             public bool IsEnabled { internal set; get; }
 
+
             // Environmental States
             public bool IsOriented { internal set; get; }
+            public bool IsSubmerged { internal set; get; }
+
             public bool IsInLocation { internal set; get; }
 
             // Efficiency
             public float Efficiency { internal set; get; }
 
             // The "Master" Logic: Can we actually pull fish?
-            public bool CanFish => IsFunctional && IsWorking && IsEnabled && IsOriented && IsInLocation;
+            public bool CanFish => IsFunctional && IsWorking && IsEnabled && IsOriented && IsInLocation && IsSubmerged;
 
             public string GetStatusMessage()
             {
@@ -782,7 +778,8 @@ namespace PEPCO
                 if (!IsWorking) return "Net Unpowered";
                 if (!IsEnabled) return "Net Hauled In";
                 if (!IsOriented) return "Wrong Orientation";
-                if (!IsInLocation) return "No Fish in Area";
+                if (!IsSubmerged) return "Not Submerged";
+                if (!IsInLocation) return "No fish, no catch :)";
                 // If we can fish, but efficiency is 0, we still show the speed warning
                 if (Efficiency <= 0) return "Invalid Speed";
                 return "Fishing";
@@ -866,12 +863,34 @@ namespace PEPCO
 
         public float GetFishEfficiencySquared(float speedSq)
         {
+            // 1. Out of bounds (Too slow or Too fast)
             if (speedSq <= 0 || speedSq >= SpeedHighSq) return 0;
-            if (speedSq >= SpeedLowSq && speedSq <= SpeedMidSq) return 1;
-            if (speedSq < SpeedLowSq) return (float)(speedSq / SpeedLowSq);
 
+            // 2. The Sweet Spot (100% Efficiency between 10m/s and 15m/s)
+            if (speedSq >= SpeedLowSq && speedSq <= SpeedMidSq) return 1;
+
+            // We need the raw linear speed to calculate both the linear and exponential curves
             float currentSpeed = (float)Math.Sqrt(speedSq);
-            float efficiency = 1.0f - (currentSpeed - 15.0f) / 10.0f;
+
+            // 3. Ramp-up zone (Perfectly Linear)
+            if (speedSq < SpeedLowSq)
+            {
+                float lowSpeed = (float)Math.Sqrt(SpeedLowSq);
+                return currentSpeed / lowSpeed; // e.g., 2.5 / 5.0 = 0.5 (50%)
+            }
+
+            // 4. Penalty zone (Exponential drop-off)
+            float midSpeed = (float)Math.Sqrt(SpeedMidSq);
+            float highSpeed = (float)Math.Sqrt(SpeedHighSq);
+
+            // Calculate how far into the penalty zone we are (0.0 to 1.0 ratio)
+            float penaltyRatio = (currentSpeed - midSpeed) / (highSpeed - midSpeed);
+
+            // Squaring the penalty ratio creates an exponential curve.
+            // Example: At 12.5 m/s (0.5 ratio), 0.5^2 = 0.25 penalty.
+            // This makes the net very forgiving at 11 m/s, but efficiency completely crashes as you approach 15 m/s.
+            float efficiency = 1.0f - (float)Math.Pow(penaltyRatio, 2);
+
             return MathHelper.Clamp(efficiency, 0f, 1f);
         }
 
@@ -983,7 +1002,8 @@ namespace PEPCO
                 float contentPercentage = (NetContent / MAX_NET_CONTENT) * 100f;
                 info.AppendLine($"--- Trawling Status {GetSpinner()} ---");
                 info.AppendLine($"Net Content: {contentPercentage:00.00}%");
-
+                string locationDetail = _evaluator.IsInLocation ? "Yes" : "No";
+                info.AppendLine($"In Fishing Location: {locationDetail}");
                 info.AppendLine($"Status: {_evaluator.GetStatusMessage()}");
 
                 if (_evaluator.CanFish)
