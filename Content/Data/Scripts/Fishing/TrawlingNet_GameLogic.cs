@@ -1197,6 +1197,7 @@ namespace PEPCO
 
         private void CloseSubparts()
         {
+            if (_cachedSubparts.Count == 0) return;
             try
             {
                 foreach (var subpart in _cachedSubparts)
