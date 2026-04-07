@@ -116,11 +116,11 @@ namespace PEPCO
 
                 a.Name = new StringBuilder("Toggle fishing");
                 a.ValidForGroups = true;
-                a.Icon = @"Textures\GUI\Icons\Actions\CharacterToggle.dds";
+                a.Icon = @"Textures\GUI\Icons\Actions\Toggle.dds";
                 a.Action = (b) => {
                     var logic = b?.GameLogic?.GetAs<FishCollectorComponent>();
                     if (logic == null) return;
-                    logic.EnableFishing ^= true; // toggle the show resources setting
+                    logic.EnableFishing ^= true; // toggle the setting
 
 
                 };
@@ -134,7 +134,52 @@ namespace PEPCO
 
                 MyAPIGateway.TerminalControls.AddAction<IMyFunctionalBlock>(a);
             }
+            {
+                var a = MyAPIGateway.TerminalControls.CreateAction<IMyFunctionalBlock>(IdPrefix + "SetEnableFishingActionOn");
 
+                a.Name = new StringBuilder("Deploy net on");
+                a.ValidForGroups = true;
+                a.Icon = @"Textures\GUI\Icons\Actions\SwitchOn.dds";
+                a.Action = (b) => {
+                    var logic = b?.GameLogic?.GetAs<FishCollectorComponent>();
+                    if (logic == null) return;
+                    logic.EnableFishing = true; // toggle the setting on
+
+
+                };
+                a.Writer = (b, sb) =>
+                {
+                    var logic = b?.GameLogic?.GetAs<FishCollectorComponent>();
+                    if (logic == null) return;
+                    sb.Append($"Fishing\n{(logic.EnableFishing ? "On" : "Off")}");
+                };
+                a.Enabled = CustomVisibleCondition;
+
+                MyAPIGateway.TerminalControls.AddAction<IMyFunctionalBlock>(a);
+            }
+            {
+                var a = MyAPIGateway.TerminalControls.CreateAction<IMyFunctionalBlock>(IdPrefix + "SetEnableFishingActionOff");
+
+                a.Name = new StringBuilder("Deploy net off");
+                a.ValidForGroups = true;
+                a.Icon = @"Textures\GUI\Icons\Actions\SwitchOff.dds";
+                a.Action = (b) => {
+                    var logic = b?.GameLogic?.GetAs<FishCollectorComponent>();
+                    if (logic == null) return;
+                    logic.EnableFishing = false; // toggle the setting off
+
+
+                };
+                a.Writer = (b, sb) =>
+                {
+                    var logic = b?.GameLogic?.GetAs<FishCollectorComponent>();
+                    if (logic == null) return;
+                    sb.Append($"Fishing\n{(logic.EnableFishing ? "On" : "Off")}");
+                };
+                a.Enabled = CustomVisibleCondition;
+
+                MyAPIGateway.TerminalControls.AddAction<IMyFunctionalBlock>(a);
+            }
 
 
         }
