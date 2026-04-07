@@ -119,6 +119,8 @@ namespace PEPCO
             }
         }
 
+        public float NetContentPercentage => NetContent / MAX_NET_CONTENT;
+
         public string NetContentSubtypeId
         {
             get { return Content.NetContentSubtypeId; }
