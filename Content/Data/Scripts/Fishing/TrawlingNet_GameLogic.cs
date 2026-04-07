@@ -54,9 +54,9 @@ namespace PEPCO
         private int _settingsSyncCountdown;
         public const int SETTINGS_CHANGED_COUNTDOWN = (60 * 1) / 10;
 
-        private const float MAX_NET_CONTENT = 1562f;
+        private const float MAX_NET_CONTENT = 15.625f;
 
-        private static readonly Dictionary<string, MyPhysicalItemDefinition> _cache =
+        private static readonly Dictionary<string, MyPhysicalItemDefinition> _cachePhysicalItemDef =
             new Dictionary<string, MyPhysicalItemDefinition>();
 
         private static readonly MyObjectBuilderType ConsumableType = typeof(MyObjectBuilder_ConsumableItem);
@@ -65,6 +65,8 @@ namespace PEPCO
         private const int CATCH_MAX = 55;
         private const int ESCAPE_MIN = 1;
         private const int ESCAPE_MAX = 10;
+
+        public const string WARNINGTEXT = "[color=#FFFF0000]Not enough space in inventory! Net content will be lost.[/color]";
 
         private int _deckFishVisualState = 0;
         private int _deckFishVisibleTicks = 0;
@@ -88,6 +90,20 @@ namespace PEPCO
 
         private readonly Dictionary<string, MyEntitySubpart> _cachedSubparts = new Dictionary<string, MyEntitySubpart>();
 
+        public bool ContentToBeLost
+        {
+            get {
+                var inventory = Block?.GetInventory(0);
+
+                if (inventory == null) return false;
+
+                // Check if total net content can still fit in block inventory
+                var leftInventoryVolume = (float)(inventory.MaxVolume - inventory.CurrentVolume);
+
+                return TotalNetContent > leftInventoryVolume;
+            }
+        }
+
         public bool EnableFishing
         {
             get { return Settings.EnableFishing; }
@@ -100,7 +116,7 @@ namespace PEPCO
                 //SetSubpartVisibility(SUBPART_NAME_NET, value, Block as IMyEntity);
                 if (!value)
                 {
-                    LogDebug($"AQD_LG_TrawlingNet: EnableFishing set to false, calling SyncNetContent(emptyNet:true); NetContent={NetContent}; entId={Entity?.EntityId}");
+                    LogDebug($"AQD_LG_TrawlingNet: EnableFishing set to false, calling SyncNetContent(emptyNet:true); NetContent={TotalNetContent}; entId={Entity?.EntityId}");
                     SyncNetContent(emptyNet: true);
                 }
 
@@ -108,41 +124,54 @@ namespace PEPCO
             }
         }
 
-        public float NetContent
+        public float TotalNetContent
         {
-            get { return Content.NetContent; }
-            set
+            get
             {
-                if (Content.NetContent == value) return;
-                Content.NetContent = MathHelper.Clamp(value, 0, MAX_NET_CONTENT);
-                NetContentChanged();
+                float total = 0; // Volume in m^3
+                if (Content.CaughtFish != null)
+                {
+                    foreach (var kvp in Content.CaughtFish)
+                    {
+                        // Look up the physical item definition for this subtype, with caching to avoid repeated lookups
+                        MyPhysicalItemDefinition def;
+                        if (_cachePhysicalItemDef.TryGetValue(kvp.Key, out def))
+                        {
+                            total += kvp.Value * def.Volume;
+                        }
+                        else
+                        {
+                            var newDefId = new MyDefinitionId(ConsumableType, kvp.Key);
+                            MyPhysicalItemDefinition newDef;
+                            if (MyDefinitionManager.Static.TryGetDefinition(newDefId, out newDef))
+                            {
+                                _cachePhysicalItemDef[kvp.Key] = newDef;
+                                total += kvp.Value * newDef.Volume;
+                            }
+                            else
+                            {
+                                LogDebug($"AQD_LG_TrawlingNet: Failed to find definition for subtype '{kvp.Key}', skipping in net content calculation; entId={Entity?.EntityId}");
+                            }
+                        }
+                    }
+                }
+                return total;
             }
         }
 
-        public float NetContentPercentage => NetContent / MAX_NET_CONTENT;
-
-        public string NetContentSubtypeId
-        {
-            get { return Content.NetContentSubtypeId; }
-            set
-            {
-                if (Content.NetContentSubtypeId == value) return;
-                Content.NetContentSubtypeId = value;
-                NetContentChanged();
-            }
-        }
+        public float NetContentPercentage => TotalNetContent / MAX_NET_CONTENT;
 
         public bool IsInFishLocation
         {
             get { return Content.IsInFishLocation; }
             set
             {
-                if (Content.IsInFishLocation == value) return;
-                Content.IsInFishLocation = value;
-
-                // Tie in the evaluator here
+                // ALWAYS update the evaluator so it doesn't desync on save loads
                 if (_evaluator != null)
                     _evaluator.IsInLocation = value;
+
+                if (Content.IsInFishLocation == value) return;
+                Content.IsInFishLocation = value;
 
                 NetContentChanged();
             }
@@ -153,13 +182,13 @@ namespace PEPCO
             get { return Content.LastSpeedSq; }
             set
             {
-                if (Content.LastSpeedSq == value) return;
-
-                // Tie in the evaluator here
+                // ALWAYS update the evaluator so it doesn't desync on save loads
                 if (_evaluator != null)
                     _evaluator.Efficiency = GetFishEfficiencySquared(value);
 
+                if (Content.LastSpeedSq == value) return;
                 Content.LastSpeedSq = value;
+
                 NetContentChanged();
             }
         }
@@ -198,7 +227,10 @@ namespace PEPCO
 
                 _random = new Random();
                 Settings.EnableFishing = false;
-                NetContent = 0f;
+                
+                
+                // NetContent = 0f;
+                Content.CaughtFish = new Dictionary<string, float>(); // Initialize the dictionary to avoid null refs later, we can just check if the total is 0 to know if it's empty instead of null checks
 
                 LoadSettings();
                 SaveSettings();
@@ -641,7 +673,7 @@ namespace PEPCO
 
             if (_evaluator.IsEnabled && !_evaluator.IsFunctional)
             {
-                NetContent = 0;
+                ClearNet();
                 EnableFishing = false;
             }
         }
@@ -675,7 +707,7 @@ namespace PEPCO
             {
                 //LogDebug($"AQD_LG_TrawlingNet: NOT Oriented for fishing (angle={MathHelper.ToDegrees(angle):F1} degrees), NetContent reset to 0");
                 _evaluator.IsOriented = false;
-                NetContent = 0;
+                ClearNet();
             }
 
         }
@@ -856,8 +888,9 @@ namespace PEPCO
                         // -------------------------------------------------------
 
                         LastCaught = amount * efficiency;
-                        NetContent += LastCaught;
-                        NetContentSubtypeId = "Fish";
+
+                        // With (temporarily hardcoding "Fish" until we implement Step 3):
+                        AddFishToNet("Fish", LastCaught);
 
                         WaterAPI.CreateBubble(worldPosition, 2);
                     }
@@ -866,7 +899,10 @@ namespace PEPCO
                 {
                     // If not in a fish location, fish escape the net
                     int escaped = _random.Next(ESCAPE_MIN, ESCAPE_MAX);
-                    NetContent = Math.Max(0, NetContent - escaped);
+
+                    // With:
+                    RemoveFishAmount(escaped);
+
                     LastSpeedSq = 0f;
                     LastCaught = 0f;
                 }
@@ -912,59 +948,73 @@ namespace PEPCO
         {
             try
             {
-                //LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory called; NetContent={NetContent}; SubtypeId={Content.NetContentSubtypeId}; entId={Entity?.EntityId}");
+                float totalContent = TotalNetContent;
 
-                if (NetContent < 0.01f)
+                if (totalContent < 0.01f || Content.CaughtFish == null || Content.CaughtFish.Count == 0)
                 {
-                    //LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory: NetContent below threshold, skipping; entId={Entity?.EntityId}");
                     return;
                 }
 
-                float contentPercentage = (NetContent / MAX_NET_CONTENT) * 100f;
-
+                // Calculate visual state based on total net fill percentage
+                float contentPercentage = (totalContent / MAX_NET_CONTENT) * 100f;
                 int newState = (int)Math.Ceiling(contentPercentage / 20f);
                 _deckFishVisualState = MathHelper.Clamp(newState, 0, SUBPART_NAME_FISH_DECK_FISH.Length);
 
                 LogDebug($"AQD_LG_TrawlingNet: Visual State calculated: {_deckFishVisualState} ({contentPercentage:F1}%)");
 
                 IMyInventory inventory = _fishCollector.GetInventory();
-                if (inventory == null)
+
+                // Only attempt to transfer if we have a valid inventory
+                if (inventory != null)
                 {
-                    //LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory: inventory is null, skipping; entId={Entity?.EntityId}");
-                    return;
+                    List<string> subtypesInNet = new List<string>(Content.CaughtFish.Keys);
+
+                    foreach (var subtypeId in subtypesInNet)
+                    {
+                        float amountInNet = Content.CaughtFish[subtypeId];
+
+                        // Only attempt to move whole fish
+                        int availableWholeFish = (int)Math.Floor(amountInNet);
+                        if (availableWholeFish <= 0) continue;
+
+                        var itemDefinition = GetDefinition(subtypeId);
+                        if (itemDefinition == null)
+                        {
+                            LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory: itemDefinition not found for SubtypeId='{subtypeId}', skipping transfer.");
+                            continue;
+                        }
+
+                        float volumePerFish = itemDefinition.Volume;
+                        if (volumePerFish <= 0) volumePerFish = 0.01f;
+
+                        // Calculate how many of THIS specific fish we can fit
+                        float availableVolume = (float)(inventory.MaxVolume - inventory.CurrentVolume);
+                        int roomForFish = (int)Math.Floor(availableVolume / volumePerFish);
+
+                        int fishToMove = Math.Min(availableWholeFish, roomForFish);
+
+                        if (fishToMove > 0)
+                        {
+                            var contentObj = (MyObjectBuilder_PhysicalObject)MyObjectBuilderSerializer.CreateNewObject(itemDefinition.Id);
+                            inventory.AddItems((MyFixedPoint)fishToMove, contentObj);
+
+                            LogDebug($"AQD_LG_TrawlingNet: Transferred {fishToMove}x {subtypeId} to inventory.");
+                        }
+
+                        // If the inventory filled up on this cycle, stop processing further fish types
+                        if (roomForFish <= fishToMove)
+                        {
+                            LogDebug($"AQD_LG_TrawlingNet: Inventory full! Excess fish will escape.");
+                            break;
+                        }
+                    }
                 }
 
-                var itemDefinition = GetDefinition(Content.NetContentSubtypeId);
-                if (itemDefinition == null)
-                {
-                    LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory: itemDefinition not found for SubtypeId='{Content.NetContentSubtypeId}', skipping; entId={Entity?.EntityId}");
-                    return;
-                }
-                //LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory: itemDefinition found; Id={itemDefinition.Id}; Volume={itemDefinition.Volume}; entId={Entity?.EntityId}");
-
-                float volumePerFish = itemDefinition.Volume;
-                if (volumePerFish <= 0) volumePerFish = 0.01f;
-
-                float availableVolume = (float)(inventory.MaxVolume - inventory.CurrentVolume);
-                int roomForFish = (int)Math.Floor(availableVolume / volumePerFish);
-                int fishToMove = Math.Min((int)Math.Round(NetContent), roomForFish);
-                //LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory: availableVolume={availableVolume:F3}; roomForFish={roomForFish}; fishToMove={fishToMove}; entId={Entity?.EntityId}");
-
-                if (fishToMove > 0)
-                {
-                    var content = (MyObjectBuilder_PhysicalObject)MyObjectBuilderSerializer.CreateNewObject(itemDefinition.Id);
-                    inventory.AddItems((MyFixedPoint)fishToMove, content);
-                    //LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory: added {fishToMove} fish to inventory; entId={Entity?.EntityId}");
-                }
-                else
-                {
-                    //LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory: fishToMove=0, nothing added; entId={Entity?.EntityId}");
-                }
-
-                NetContent = 0f;
-                //LogDebug($"AQD_LG_TrawlingNet: TransferNetContentToInventory: NetContent reset to 0; entId={Entity?.EntityId}");
-
-
+                // The net has been hauled in. 
+                // Regardless of whether the inventory was full or if there were fractional fish left,
+                // we completely empty the net so they "escape".
+                ClearNet();
+                LogDebug($"AQD_LG_TrawlingNet: Net cleared. All transferred, and excess/fractional fish escaped.");
 
             }
             catch (Exception e)
@@ -1013,9 +1063,18 @@ namespace PEPCO
         {
             try
             {
-                float contentPercentage = (NetContent / MAX_NET_CONTENT) * 100f;
+                float contentPercentage = (TotalNetContent / MAX_NET_CONTENT) * 100f;
                 info.AppendLine($"--- Trawling Status {GetSpinner()} ---");
-                info.AppendLine($"Net Content: {contentPercentage:00.00}%");
+                info.AppendLine($"Total Net Capacity: {contentPercentage:00.00}%");
+
+                if (Content.CaughtFish != null && Content.CaughtFish.Count > 0)
+                {
+                    info.AppendLine("Catch Breakdown:");
+                    foreach (var kvp in Content.CaughtFish)
+                    {
+                        info.AppendLine($" - {GetDisplayName(kvp.Key) ?? kvp.Key}: {Math.Floor(kvp.Value)}");
+                    }
+                }
                 string locationDetail = _evaluator.IsInLocation ? "Yes" : "No";
                 info.AppendLine($"In Fishing Location: {locationDetail}");
                 info.AppendLine($"Status: {_evaluator.GetStatusMessage()}");
@@ -1025,6 +1084,8 @@ namespace PEPCO
                     string speedHint = _evaluator.Efficiency < 1f ? (LastSpeedSq < SpeedLowSq ? " (too slow)" : " (too fast)") : "";
                     info.AppendLine($"Efficiency: {(_evaluator.Efficiency * 100):F0}%{speedHint}");
                 }
+
+                if (ContentToBeLost) info.AppendLine(WARNINGTEXT);
             }
             catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error in AppendCustomInfo!\n{e}"); }
         }
@@ -1060,6 +1121,55 @@ namespace PEPCO
         #region Sync and stuff
         // --- Data Persistence and Sync 
 
+        public void AddFishToNet(string subtypeId, float amount)
+        {
+            float currentTotal = TotalNetContent;
+            float spaceLeft = MAX_NET_CONTENT - currentTotal;
+
+            if (spaceLeft <= 0) return;
+
+            float amountToAdd = MathHelper.Clamp(amount, 0, spaceLeft);
+
+            if (Content.CaughtFish == null) Content.CaughtFish = new Dictionary<string, float>();
+
+            if (!Content.CaughtFish.ContainsKey(subtypeId))
+                Content.CaughtFish[subtypeId] = 0;
+
+            Content.CaughtFish[subtypeId] += amountToAdd;
+            NetContentChanged();
+        }
+
+        public void RemoveFishAmount(float amountToRemove)
+        {
+            if (amountToRemove <= 0 || Content.CaughtFish == null) return;
+
+            var keys = new List<string>(Content.CaughtFish.Keys);
+            foreach (var key in keys)
+            {
+                if (amountToRemove <= 0) break;
+
+                float current = Content.CaughtFish[key];
+                if (current <= amountToRemove)
+                {
+                    amountToRemove -= current;
+                    Content.CaughtFish.Remove(key);
+                }
+                else
+                {
+                    Content.CaughtFish[key] -= amountToRemove;
+                    amountToRemove = 0;
+                }
+            }
+            NetContentChanged();
+        }
+
+        public void ClearNet()
+        {
+            if (Content.CaughtFish != null)
+                Content.CaughtFish.Clear();
+            NetContentChanged();
+        }
+
         public void UpdateSettingsFromInput(TrawlingNetSettings loadedSettingssettings)
         {
             try
@@ -1078,14 +1188,10 @@ namespace PEPCO
         {
             try
             {
-                LogDebug($"AQD_LG_TrawlingNet: SyncNetContent sending; emptyNet={emptyNet}; NetContent={NetContent}; subtype={NetContentSubtypeId}");
-
-                // BUG FIX: Instantiate a NEW object for the packet. 
-                // Using the persistent 'Content' reference was causing the 'EmptyNet' flag to get stuck on True locally.
-                var packetContent = new TrawlingNetContent
+                string fishSummary = Content.CaughtFish != null ? string.Join(", ", Content.CaughtFish.Keys) : "None";
+                LogDebug($"AQD_LG_TrawlingNet: SyncNetContent called; TotalNetContent={TotalNetContent}; FishTypes=[{fishSummary}]; IsInFishLocation={IsInFishLocation}; LastSpeedSq={LastSpeedSq}; LastCaught={LastCaught}; emptyNet={emptyNet}; entId={Entity?.EntityId}"); var packetContent = new TrawlingNetContent
                 {
-                    NetContent = this.NetContent,
-                    NetContentSubtypeId = this.NetContentSubtypeId,
+                    CaughtFish = new Dictionary<string, float>(this.Content.CaughtFish ?? new Dictionary<string, float>()),
                     IsInFishLocation = this.IsInFishLocation,
                     LastSpeedSq = this.LastSpeedSq,
                     LastCaught = this.LastCaught,
@@ -1106,12 +1212,10 @@ namespace PEPCO
 
                 // BUG FIX: Only sync SubtypeId if the incoming one is valid.
                 // This prevents 'Fish' being overwritten by an empty string during network jitter.
-                if (!string.IsNullOrWhiteSpace(loadedNetContent.NetContentSubtypeId))
+                if (loadedNetContent.CaughtFish != null && loadedNetContent.CaughtFish.Count > 0)
                 {
-                    Content.NetContentSubtypeId = loadedNetContent.NetContentSubtypeId;
+                    Content.CaughtFish = new Dictionary<string, float>(loadedNetContent.CaughtFish ?? new Dictionary<string, float>());
                 }
-
-                Content.NetContent = MathHelper.Clamp(loadedNetContent.NetContent, 0, MAX_NET_CONTENT);
                 Content.IsInFishLocation = loadedNetContent.IsInFishLocation;
                 Content.LastSpeedSq = loadedNetContent.LastSpeedSq;
                 Content.LastCaught = loadedNetContent.LastCaught;
@@ -1135,9 +1239,14 @@ namespace PEPCO
                 var loadedNetContent = MyAPIGateway.Utilities.SerializeFromBinary<TrawlingNetContent>(Convert.FromBase64String(rawData));
                 if (loadedNetContent != null)
                 {
-                    // BUG FIX: Load the entire content object instead of just the float value
-                    Content.NetContent = loadedNetContent.NetContent;
-                    Content.NetContentSubtypeId = loadedNetContent.NetContentSubtypeId;
+                    // Load the dictionary, ensuring we don't accidentally assign null
+                    Content.CaughtFish = loadedNetContent.CaughtFish != null
+                        ? new Dictionary<string, float>(loadedNetContent.CaughtFish)
+                        : new Dictionary<string, float>();
+
+                    // Load the other tracking variables
+                    Content.IsInFishLocation = loadedNetContent.IsInFishLocation;
+                    Content.LastSpeedSq = loadedNetContent.LastSpeedSq;
                     Content.LastCaught = loadedNetContent.LastCaught;
                 }
             }
@@ -1256,11 +1365,11 @@ namespace PEPCO
 
             MyPhysicalItemDefinition definition;
 
-            if (!_cache.TryGetValue(subtypeName, out definition))
+            if (!_cachePhysicalItemDef.TryGetValue(subtypeName, out definition))
             {
                 var id = new MyDefinitionId(ConsumableType, subtypeName);
                 definition = MyDefinitionManager.Static.GetPhysicalItemDefinition(id);
-                _cache[subtypeName] = definition;
+                _cachePhysicalItemDef[subtypeName] = definition;
             }
 
             return definition;

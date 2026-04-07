@@ -1,6 +1,7 @@
-﻿using ProtoBuf;
+﻿using Digi.NetworkLib;
+using ProtoBuf;
+using System.Collections.Generic;
 using VRageMath;
-using Digi.NetworkLib;
 
 namespace PEPCO
 {
@@ -36,18 +37,18 @@ namespace PEPCO
     public class TrawlingNetContent
     {
 
-        /// <summary>
-        /// Content of the trawling net
-        /// </summary>
-        [ProtoMember(1)]
-        public float NetContent;
+        ///// <summary>
+        ///// Content of the trawling net
+        ///// </summary>
+        //[ProtoMember(1)]
+        //public float NetContent;
 
 
-        /// <summary>
-        /// The subtype of the content, for example "Fish", in the future I hope Enenra also adds Lobsters 🦞
-        /// </summary>
-        [ProtoMember(2)]
-        public string NetContentSubtypeId;
+        ///// <summary>
+        ///// The subtype of the content, for example "Fish", in the future I hope Enenra also adds Lobsters 🦞
+        ///// </summary>
+        //[ProtoMember(2)]
+        //public string NetContentSubtypeId;
 
         /// <summary>
         /// Defaults to false, if true the net is to be emptied and the content needs to be transfered to inventory on server and clients - I think?
@@ -75,6 +76,12 @@ namespace PEPCO
         /// </summary>
         [ProtoMember(6)]
         public float LastCaught;
+
+        /// <summary>
+        /// Content of the trawling net, broken down by SubtypeId
+        /// </summary>
+        [ProtoMember(7)]
+        public Dictionary<string, float> CaughtFish = new Dictionary<string, float>();
     }
 
 }

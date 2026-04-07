@@ -194,7 +194,7 @@ namespace PEPCO
                     var logic = b?.GameLogic?.GetAs<FishCollectorComponent>();
                     if (logic == null) return -1f;
                     
-                    return logic.NetContent;
+                    return logic.TotalNetContent;
                 };
 
                 p.Setter = (b, v) =>

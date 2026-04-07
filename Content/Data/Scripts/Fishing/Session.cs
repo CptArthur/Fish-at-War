@@ -109,7 +109,7 @@ namespace PEPCO
 
         void TrawlingNetContentPacketReceived(TrawlingNet_ContentPacket packet, ref PacketInfo packetInfo, ulong senderSteamId)
         {
-            LogDebug($"AQD_LG_TrawlingNet Session: TrawlingNetContentPacketReceived; EntityId={packet.EntityId}; NetContent={packet.PacketContent?.NetContent}; EmptyNet={packet.PacketContent?.EmptyNet}; SubtypeId={packet.PacketContent?.NetContentSubtypeId}; sender={senderSteamId}");
+            LogDebug($"AQD_LG_TrawlingNet Session: TrawlingNetContentPacketReceived; EntityId={packet.EntityId}; NetContent={packet.PacketContent?.CaughtFish.Count}; EmptyNet={packet.PacketContent?.EmptyNet}; SubtypeId={packet.PacketContent?.CaughtFish.Keys.ToString()}; sender={senderSteamId}");
 
             IMyEntity ent = MyEntities.GetEntityById(packet.EntityId);
             if (ent == null)

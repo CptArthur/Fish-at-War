@@ -109,15 +109,35 @@ namespace PEPCO
             if (logic?.Block == null) { DrawMessage("Error_Device"); return; }
             logic.Block.RefreshCustomInfo();
 
-            // Print the same content as the custom data of the trawling net block
             using (var frame = Surface.DrawFrame())
             {
                 string contentText = logic.Block.CustomInfo;
-                var textSprite = MySprite.CreateText(contentText, "White", Color.Cyan, 0.7f, TextAlignment.LEFT);
-                textSprite.Position = ((Surface.TextureSize - Surface.SurfaceSize) * 0.5f) + new Vector2(16, 16);
-                frame.Add(textSprite);
-            }
+                string warningText = FishCollectorComponent.WARNINGTEXT;
 
+                // Strip the warning out of the main text block
+                if (contentText.Contains(warningText))
+                {
+                    contentText = contentText.Replace(warningText, "").TrimEnd();
+                }
+
+                // Draw the standard Cyan text
+                var textSprite = MySprite.CreateText(contentText, "White", Color.Cyan, 0.7f, TextAlignment.LEFT);
+                textSprite.Position = viewportPos + new Vector2(16, 16);
+                frame.Add(textSprite);
+
+                // Draw the Red warning sprite if the condition is met
+                if (logic.ContentToBeLost)
+                {
+                    // Calculate the Y offset based on how many lines are in the main text
+                    // ~20.5 pixels is the standard line-height for the "White" font at 0.7f scale
+                    int lineCount = contentText.Split('\n').Length;
+                    float yOffset = 16 + (lineCount * 20.5f);
+
+                    var redSprite = MySprite.CreateText("Not enough space in inventory! Net content will be lost.", "White", Color.Red, 0.7f, TextAlignment.LEFT);
+                    redSprite.Position = viewportPos + new Vector2(16, yOffset);
+                    frame.Add(redSprite);
+                }
+            }
         }
         #endregion
 
