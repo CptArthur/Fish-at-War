@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<LCDTextures>
+		<LCDTextureDefinition>
+			<Id>
+				<TypeId>LCDTextureDefinition</TypeId>
+				<SubtypeId>TrawlingUIDefault</SubtypeId>
+			</Id>
+			<TexturePath>Textures\GUI\TSS\UI-Default.dds</TexturePath>
+		</LCDTextureDefinition>
+		<LCDTextureDefinition>
+			<Id>
+				<TypeId>LCDTextureDefinition</TypeId>
+				<SubtypeId>TrawlingSpinner</SubtypeId>
+			</Id>
+			<TexturePath>Textures\GUI\TSS\Spinner.dds</TexturePath>
+		</LCDTextureDefinition>
+		<LCDTextureDefinition>
+			<Id>
+				<TypeId>LCDTextureDefinition</TypeId>
+				<SubtypeId>FishIcon</SubtypeId>
+			</Id>
+			<TexturePath>Textures\GUI\Icons\FAW_Item_Fish1.dds</TexturePath>
+		</LCDTextureDefinition>
+	</LCDTextures>
+</Definitions>

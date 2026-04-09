@@ -72,21 +72,24 @@ namespace PEPCO
             {
                 base.Run();
 
-                // Cache the TrawlingNetBlock and its logic component for efficiency, but validate their existence each tick in case of changes in the grid
+                // Cache the TrawlingNetBlock and its logic component for efficiency
                 if (TrawlingNetBlock == null)
                 {
                     // Get the Grid
                     var grid = TerminalBlock.CubeGrid;
                     if (grid == null) { DrawMessage("Error_Device - Grid dirty"); return; }
 
-                    // Get the first block of the type and subtype MyObjectBuilder_FunctionalBlock and AQD_LG_TrawlingNet
+                    // Get the first block of the type and subtype
                     var trawlingblock = grid.GetFatBlocks<IMyFunctionalBlock>().FirstOrDefault(b => b.BlockDefinition.SubtypeId == "AQD_LG_TrawlingNet");
-                    if (trawlingblock == null) { DrawMessage("Error_Device - Trawling net dirty"); return; }
+                    if (trawlingblock == null) { DrawMessage("Error_Device - No trawling net found."); return; }
 
                     logic = trawlingblock?.GameLogic?.GetAs<FishCollectorComponent>();
 
                     // 1. Validation Checks
-                    if (logic == null) { DrawMessage("Error_Device - Trawling net logic dirty"); return; }
+                    if (logic == null) { DrawMessage("Error_Device - Trawling net logic dirty. Logic missing.\nTell UZAR!"); return; }
+
+                    // --- THE FIX: Cache the block so we don't scan the grid again! ---
+                    TrawlingNetBlock = trawlingblock;
                 }
                 // 3. Render
                 Draw();
@@ -103,38 +106,64 @@ namespace PEPCO
 
         void Draw()
         {
-            Vector2 viewportPos = (Surface.TextureSize - Surface.SurfaceSize) / 2f;
-            _viewport = new RectangleF(viewportPos, Surface.SurfaceSize);
-
-            if (logic?.Block == null) { DrawMessage("Error_Device"); return; }
             logic.Block.RefreshCustomInfo();
+
+            // 1. Calculate safe drawing area
+            // SurfaceSize is the visible part; TextureSize includes the hidden bezels.
+            Vector2 surfaceSize = Surface.SurfaceSize;
+            Vector2 textureSize = Surface.TextureSize;
+            Vector2 viewportOffset = (textureSize - surfaceSize) / 2f;
+
+            // 2. Calculate scale factor (Targeting 512px as the '1.0' baseline)
+            float minAxis = Math.Min(surfaceSize.X, surfaceSize.Y);
+            float uiScale = minAxis / 512f;
+
+            // Adjust font size. 0.7f is your base; uiScale adjusts it for the LCD res.
+            float scaledFontSize = 1f * uiScale;
+            float scaledPadding = 16f * uiScale;
 
             using (var frame = Surface.DrawFrame())
             {
-                string contentText = logic.Block.CustomInfo;
-                string warningText = FishCollectorComponent.WARNINGTEXT;
+                // --- FIX 1: DRAW BACKGROUND ---
+                // This ensures the whole screen is your dark blue color
+                frame.Add(new MySprite
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = "SquareSimple",
+                    Position = textureSize / 2f,
+                    Size = textureSize,
+                    Color = new Color(12, 25, 33, 255),
+                    Alignment = TextAlignment.CENTER
+                });
 
-                // Strip the warning out of the main text block
-                if (contentText.Contains(warningText))
+                // 3. Prepare Content
+                string contentText = logic.Block.CustomInfo ?? "";
+                string warningText = FishCollectorComponent.WARNINGTEXT ?? "";
+
+                if (!string.IsNullOrEmpty(warningText) && contentText.Contains(warningText))
                 {
                     contentText = contentText.Replace(warningText, "").TrimEnd();
                 }
 
-                // Draw the standard Cyan text
-                var textSprite = MySprite.CreateText(contentText, "White", Color.Cyan, 0.7f, TextAlignment.LEFT);
-                textSprite.Position = viewportPos + new Vector2(16, 16);
+                // --- FIX 2: TEXT POSITIONING ---
+                // We add viewportOffset to move past the LCD bezels into the visible area
+                Vector2 textPos = viewportOffset + new Vector2(scaledPadding, scaledPadding);
+
+                var textSprite = MySprite.CreateText(contentText, "White", Color.Cyan, scaledFontSize, TextAlignment.LEFT);
+                textSprite.Position = textPos;
                 frame.Add(textSprite);
 
-                // Draw the Red warning sprite if the condition is met
+                // 4. Warning Logic
                 if (logic.ContentToBeLost)
                 {
-                    // Calculate the Y offset based on how many lines are in the main text
-                    // ~20.5 pixels is the standard line-height for the "White" font at 0.7f scale
+                    // Calculate dynamic Y offset based on line count
+                    // 'White' font height is roughly 30px at 1.0 scale
+                    float lineSpacing = 30f * scaledFontSize;
                     int lineCount = contentText.Split('\n').Length;
-                    float yOffset = 16 + (lineCount * 20.5f);
+                    float yOffset = (lineCount * lineSpacing) + (8f * uiScale); // Extra gap
 
-                    var redSprite = MySprite.CreateText("Not enough space in inventory! Net content will be lost.", "White", Color.Red, 0.7f, TextAlignment.LEFT);
-                    redSprite.Position = viewportPos + new Vector2(16, yOffset);
+                    var redSprite = MySprite.CreateText("Not enough inventory space!\nNet content will be lost.", "White", Color.Red, scaledFontSize, TextAlignment.LEFT);
+                    redSprite.Position = textPos + new Vector2(0, yOffset);
                     frame.Add(redSprite);
                 }
             }

@@ -45,9 +45,9 @@ namespace PEPCO
 
         private Random _random;
 
-        private const double SpeedLowSq = 5 * 5;
-        private const double SpeedMidSq = 10 * 10;
-        private const double SpeedHighSq = 15 * 15;
+        public const double SpeedLowSq = 5 * 5;
+        public const double SpeedMidSq = 10 * 10;
+        public const double SpeedHighSq = 15 * 15;
 
         public readonly TrawlingNetSettings Settings = new TrawlingNetSettings();
         public readonly TrawlingNetContent Content = new TrawlingNetContent();
@@ -86,7 +86,7 @@ namespace PEPCO
         // Used for the SFX and bubble effect when fishing
         private bool? lastEnableFishing = null;
 
-        private NetStatusEvaluator _evaluator = new NetStatusEvaluator();
+        public NetStatusEvaluator Evaluator { get; private set; } = new NetStatusEvaluator();
 
         private readonly Dictionary<string, MyEntitySubpart> _cachedSubparts = new Dictionary<string, MyEntitySubpart>();
 
@@ -159,7 +159,7 @@ namespace PEPCO
             }
         }
 
-        public float NetContentPercentage => TotalNetContent / MAX_NET_CONTENT;
+        public float NetContentPercentage => TotalNetContent / MAX_NET_CONTENT * 100;
 
         public bool IsInFishLocation
         {
@@ -167,8 +167,8 @@ namespace PEPCO
             set
             {
                 // ALWAYS update the evaluator so it doesn't desync on save loads
-                if (_evaluator != null)
-                    _evaluator.IsInLocation = value;
+                if (Evaluator != null)
+                    Evaluator.IsInLocation = value;
 
                 if (Content.IsInFishLocation == value) return;
                 Content.IsInFishLocation = value;
@@ -183,8 +183,11 @@ namespace PEPCO
             set
             {
                 // ALWAYS update the evaluator so it doesn't desync on save loads
-                if (_evaluator != null)
-                    _evaluator.Efficiency = GetFishEfficiencySquared(value);
+                if (Evaluator != null)
+                {
+                    Evaluator.Efficiency = GetFishEfficiencySquared(value);
+                    Evaluator.LastSpeedSq = value; // --- NEW: Sync the speed to the evaluator ---
+                }
 
                 if (Content.LastSpeedSq == value) return;
                 Content.LastSpeedSq = value;
@@ -667,11 +670,11 @@ namespace PEPCO
 
         public void CheckFunctionalSafety()
         {
-            _evaluator.IsFunctional = _fishCollector.IsFunctional;
-            _evaluator.IsWorking = _fishCollector.IsWorking;
-            _evaluator.IsEnabled = EnableFishing;
+            Evaluator.IsFunctional = _fishCollector.IsFunctional;
+            Evaluator.IsWorking = _fishCollector.IsWorking;
+            Evaluator.IsEnabled = EnableFishing;
 
-            if (_evaluator.IsEnabled && !_evaluator.IsFunctional)
+            if (Evaluator.IsEnabled && !Evaluator.IsFunctional)
             {
                 ClearNet();
                 EnableFishing = false;
@@ -680,12 +683,12 @@ namespace PEPCO
 
         public void CheckBlockOrientation()
         {
-            if (!_evaluator.IsFunctional ||
-                !_evaluator.IsWorking ||
-                !_evaluator.IsEnabled ||
+            if (!Evaluator.IsFunctional ||
+                !Evaluator.IsWorking ||
+                !Evaluator.IsEnabled ||
                 _fishCollector?.CubeGrid?.Physics == null)
             {
-                _evaluator.IsOriented = false;
+                Evaluator.IsOriented = false;
                 return;
             }
 
@@ -701,21 +704,21 @@ namespace PEPCO
             if (angle < MathHelper.ToRadians(45))
             {
                 //LogDebug($"AQD_LG_TrawlingNet: Oriented for fishing (angle={MathHelper.ToDegrees(angle):F1} degrees)");
-                _evaluator.IsOriented = true;
+                Evaluator.IsOriented = true;
             }
             else
             {
                 //LogDebug($"AQD_LG_TrawlingNet: NOT Oriented for fishing (angle={MathHelper.ToDegrees(angle):F1} degrees), NetContent reset to 0");
-                _evaluator.IsOriented = false;
+                Evaluator.IsOriented = false;
                 ClearNet();
             }
 
         }
         private void CheckNetSubmersion()
         {
-            if (!_evaluator.IsFunctional || !_evaluator.IsWorking || !_evaluator.IsEnabled || !_evaluator.IsOriented)
+            if (!Evaluator.IsFunctional || !Evaluator.IsWorking || !Evaluator.IsEnabled || !Evaluator.IsOriented)
             {
-                _evaluator.IsSubmerged = false;
+                Evaluator.IsSubmerged = false;
                 return;
             }
 
@@ -724,7 +727,7 @@ namespace PEPCO
             if (!_cachedSubparts.TryGetValue(SUBPART_NAME_NET, out netSubpart) || netSubpart == null || netSubpart.Closed)
             {
                 LogDebug($"CheckNetSubmersion: Net subpart not found or invalid, cannot check submersion; entId={Entity?.EntityId}");
-                _evaluator.IsSubmerged = false; // Assume not submerged if we can't find the subpart to check, to avoid false positives
+                Evaluator.IsSubmerged = false; // Assume not submerged if we can't find the subpart to check, to avoid false positives
                 return;
             }
 
@@ -738,7 +741,7 @@ namespace PEPCO
                 !dummies.TryGetValue("net_bounds_right", out dRight))
             {
                 LogDebug($"CheckNetSubmersion: One or more dummies not found in model; entId={Entity?.EntityId}");
-                _evaluator.IsSubmerged = false; // Assume not submerged if we can't find the dummies to check, to avoid false positives
+                Evaluator.IsSubmerged = false; // Assume not submerged if we can't find the dummies to check, to avoid false positives
                 return;
             }
 
@@ -751,16 +754,16 @@ namespace PEPCO
             Vector3D worldDummyPos = LocalPositionToGlobal(localDummyCenter, netSubpart.PositionComp.WorldMatrixRef);
 
             // 4. Get the Water Surface at that stable world position
-            _evaluator.IsSubmerged = WaterAPI.IsUnderwater(worldDummyPos);
+            Evaluator.IsSubmerged = WaterAPI.IsUnderwater(worldDummyPos);
 
-            LogDebug($"CheckNetSubmersion: IsSubmerged={_evaluator.IsSubmerged}");
+            LogDebug($"CheckNetSubmersion: IsSubmerged={Evaluator.IsSubmerged}");
         }
         public void UpdateLocationStatus()
         {
             try
             {
-                if (!_evaluator.IsFunctional ||
-                    !_evaluator.IsWorking)
+                if (!Evaluator.IsFunctional ||
+                    !Evaluator.IsWorking)
                 {
                     IsInFishLocation = false;
                     return;
@@ -801,6 +804,23 @@ namespace PEPCO
             // Efficiency
             public float Efficiency { internal set; get; }
 
+            public float LastSpeedSq { internal set; get; }
+
+            public string SpeedHint
+            {
+                get
+                {
+                    if (Efficiency >= 1f) return "Optimal";
+                    // Note: You might need to pass LastSpeedSq into the evaluator to make this check!
+                    if (LastSpeedSq < SpeedLowSq) return "too slow";
+                    return "too fast";
+                }
+            }
+
+            public bool IsOperational => IsFunctional && IsWorking;
+
+            public bool IsOperating => IsOperational && IsEnabled;
+
             // The "Master" Logic: Can we actually pull fish?
             public bool CanFish => IsFunctional && IsWorking && IsEnabled && IsOriented && IsInLocation && IsSubmerged;
 
@@ -808,13 +828,32 @@ namespace PEPCO
             {
                 if (!IsFunctional) return "Net Damaged";
                 if (!IsWorking) return "Net Unpowered";
-                if (!IsEnabled) return "Net Hauled In";
+                if (!IsEnabled) return "Net Stowed";
                 if (!IsOriented) return "Wrong Orientation";
                 if (!IsSubmerged) return "Not Submerged";
                 if (!IsInLocation) return "No fish, no catch :)";
                 // If we can fish, but efficiency is 0, we still show the speed warning
                 if (Efficiency <= 0) return "Invalid Speed";
-                return "Fishing";
+                return "Trawling";
+            }
+
+            public Color GetStatusColor()
+            {
+                if (!IsFunctional || !IsWorking) return Color.Red;
+                if (!IsEnabled) return Color.Gray;
+                if (!IsOriented || !IsSubmerged) return Color.OrangeRed;
+                if (!IsInLocation) return Color.Orange;
+                if (Efficiency <= 0) return Color.Yellow;
+                return Color.LightGreen;
+            }
+
+            public float GetStatusScale()
+            {
+                if (!IsFunctional || !IsWorking) return 1.0f;
+                if (!IsEnabled) return 1.1f;
+                if (!IsOriented || !IsSubmerged) return 0.9f;
+                if (!IsInLocation) return 0.8f;
+                return 1.1f;
             }
         }
 
@@ -1065,7 +1104,7 @@ namespace PEPCO
             {
                 float contentPercentage = (TotalNetContent / MAX_NET_CONTENT) * 100f;
                 info.AppendLine($"--- Trawling Status {GetSpinner()} ---");
-                info.AppendLine($"Total Net Capacity: {contentPercentage:00.00}%");
+                info.AppendLine($"Total Net Capacity: {NetContentPercentage:00.00}%");
 
                 if (Content.CaughtFish != null && Content.CaughtFish.Count > 0)
                 {
@@ -1075,14 +1114,14 @@ namespace PEPCO
                         info.AppendLine($" - {GetDisplayName(kvp.Key) ?? kvp.Key}: {Math.Floor(kvp.Value)}");
                     }
                 }
-                string locationDetail = _evaluator.IsInLocation ? "Yes" : "No";
+                string locationDetail = Evaluator.IsInLocation ? "Yes" : "No";
                 info.AppendLine($"In Fishing Location: {locationDetail}");
-                info.AppendLine($"Status: {_evaluator.GetStatusMessage()}");
+                info.AppendLine($"Status: {Evaluator.GetStatusMessage()}");
 
-                if (_evaluator.CanFish)
+                if (Evaluator.CanFish)
                 {
-                    string speedHint = _evaluator.Efficiency < 1f ? (LastSpeedSq < SpeedLowSq ? " (too slow)" : " (too fast)") : "";
-                    info.AppendLine($"Efficiency: {(_evaluator.Efficiency * 100):F0}%{speedHint}");
+                    string speedHint = Evaluator.Efficiency < 1f ? (LastSpeedSq < SpeedLowSq ? " (too slow)" : " (too fast)") : "";
+                    info.AppendLine($"Efficiency: {(Evaluator.Efficiency * 100):F0}%{speedHint}");
                 }
 
                 if (ContentToBeLost) info.AppendLine(WARNINGTEXT);
@@ -1248,6 +1287,10 @@ namespace PEPCO
                     Content.IsInFishLocation = loadedNetContent.IsInFishLocation;
                     Content.LastSpeedSq = loadedNetContent.LastSpeedSq;
                     Content.LastCaught = loadedNetContent.LastCaught;
+
+                    // Update the evaluator
+                    Evaluator.IsInLocation = Content.IsInFishLocation;
+                    Evaluator.Efficiency = GetFishEfficiencySquared(Content.LastSpeedSq);
                 }
             }
             catch (Exception e) { LogError($"AQD_LG_TrawlingNet: Error loading net content!\n{e}"); }
