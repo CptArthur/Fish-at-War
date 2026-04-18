@@ -1,4 +1,4 @@
-﻿using Sandbox.Game.Entities;
+using Sandbox.Game.Entities;
 using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
@@ -126,7 +126,7 @@ namespace PEPCO.Events
 
                 // --- CUSTOM MATH CONDITION ---
                 // Grab the current value in percentage (0.0 to 1.0) from the FishCollectorComponent and compare it to the threshold using the selected condition.
-                float currentValue = fishComp.NetContentPercentage;
+                float currentValue = fishComp.NetContentPercentage / 100;
 
                 bool blockMeetsCondition = false;
 
