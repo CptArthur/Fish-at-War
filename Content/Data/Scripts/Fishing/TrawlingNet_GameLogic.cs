@@ -812,8 +812,8 @@ namespace PEPCO
                 {
                     if (Efficiency >= 1f) return "Optimal";
                     // Note: You might need to pass LastSpeedSq into the evaluator to make this check!
-                    if (LastSpeedSq < SpeedLowSq) return "too slow";
-                    return "too fast";
+                    if (LastSpeedSq < SpeedLowSq) return "Too Slow";
+                    return "Too Fast";
                 }
             }
 
