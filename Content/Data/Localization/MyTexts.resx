@@ -139,5 +139,9 @@
     <value>Zorplax Snapper</value>
     <comment/>
   </data>
+  <data name="DisplayName_FAW_Item_Fish4" xml:space="preserve">
+    <value>Yellow Spikefin</value>
+    <comment/>
+  </data>
 
 </root>
